@@ -32,16 +32,34 @@ export function LeadSourcePicker({ value, onChange }: LeadSourcePickerProps) {
   const selectedInSecondary = secondary.some((s) => s.key === value);
   const showSecondary = expanded || selectedInSecondary;
 
-  function handleAddSource() {
+  async function handleAddSource() {
     if (!newSource.trim()) return;
-    // Create a key from the label
-    const key = newSource.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
-    // Add to runtime constants so it's immediately usable
-    if (!LEAD_SOURCES.find((s) => s.key === key)) {
-      LEAD_SOURCES.push({ key, label: newSource.trim() });
+    const label = newSource.trim();
+    const key = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+    // If it already exists, just select it
+    const existing = sortedSources.find((s) => s.key === key);
+    if (existing) {
+      onChange(existing.key);
+      setNewSource("");
+      setAdding(false);
+      return;
     }
-    setSortedSources([...LEAD_SOURCES]);
-    onChange(key);
+
+    try {
+      const res = await fetch("/api/admin/lead-sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label }),
+      });
+      if (!res.ok) throw new Error("Failed to create lead source");
+      const created = await res.json();
+      setSortedSources((prev) => [...prev, { key: created.key, label: created.label }]);
+      onChange(created.key);
+    } catch {
+      setSortedSources((prev) => [...prev, { key, label }]);
+      onChange(key);
+    }
     setNewSource("");
     setAdding(false);
   }
