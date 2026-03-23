@@ -7,9 +7,11 @@ import type { LeadSourceConfig } from "@/lib/types";
 
 interface LeadSourcesTabProps {
   sources: LeadSourceConfig[];
+  userRole?: string;
 }
 
-export function LeadSourcesTab({ sources: initialSources }: LeadSourcesTabProps) {
+export function LeadSourcesTab({ sources: initialSources, userRole = "admin" }: LeadSourcesTabProps) {
+  const isAdmin = userRole === "admin";
   const [sources, setSources] = useState(initialSources);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -118,11 +120,13 @@ export function LeadSourcesTab({ sources: initialSources }: LeadSourcesTabProps)
               <div className="text-[10px] text-muted-foreground font-mono">{source.key}</div>
             </div>
 
-            {/* Active toggle */}
-            <Switch
-              checked={source.isActive}
-              onCheckedChange={() => toggleActive(source.key, source.isActive)}
-            />
+            {/* Active toggle — admin only */}
+            {isAdmin && (
+              <Switch
+                checked={source.isActive}
+                onCheckedChange={() => toggleActive(source.key, source.isActive)}
+              />
+            )}
           </div>
         ))}
 

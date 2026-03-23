@@ -13,6 +13,11 @@ export async function getDataService(): Promise<DataService> {
       globalForData.dataService = createMockDataService();
       break;
     }
+    case "neon": {
+      const { createNeonDataService } = await import("./providers/neon");
+      globalForData.dataService = createNeonDataService();
+      break;
+    }
     default:
       throw new Error(`Unknown data provider: ${provider}`);
   }

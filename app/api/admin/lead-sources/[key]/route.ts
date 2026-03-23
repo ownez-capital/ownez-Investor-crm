@@ -8,9 +8,18 @@ export async function PATCH(
   { params }: { params: Promise<{ key: string }> }
 ) {
   try {
-    await requireSession();
+    const session = await requireSession();
     const { key } = await params;
     const body = await request.json();
+
+    // Deactivating a lead source requires admin role
+    if (body.isActive === false && session.role !== "admin") {
+      return NextResponse.json(
+        { error: "Only admins can deactivate lead sources" },
+        { status: 403 }
+      );
+    }
+
     const ds = await getDataService();
     const source = await ds.updateLeadSource(key, body);
     revalidatePath("/admin");

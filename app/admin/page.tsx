@@ -43,7 +43,7 @@ export default async function AdminPage() {
         </TabsContent>
 
         <TabsContent value="lead-sources">
-          <LeadSourcesTab sources={leadSources} />
+          <LeadSourcesTab sources={leadSources} userRole={session.role} />
         </TabsContent>
 
         <TabsContent value="stages">

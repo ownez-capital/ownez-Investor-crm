@@ -396,12 +396,54 @@ async function testAdminConfig() {
   });
 }
 
+// ─── Seed test data for non-mock providers ───
+
+async function seedTestData() {
+  const provider = process.env.DATA_PROVIDER || "mock";
+  if (provider === "mock") return; // mock already has data
+
+  console.log("  🌱 Seeding test data for non-mock provider...\n");
+  const ds = await getDataService();
+
+  // Create a test org
+  await ds.createOrganization({ name: "Calloway Family Office", type: "family_office", notes: null });
+
+  // Create test prospects with various stages
+  const prospect1 = await ds.createPerson({
+    fullName: "Robert Calloway",
+    roles: ["prospect"],
+    pipelineStage: "active_engagement",
+    leadSource: "velocis_network",
+    assignedRepId: "u-chad",
+    email: "rcalloway@callowayfo.com",
+    initialInvestmentTarget: 500000,
+  });
+
+  // Create activities for the prospect
+  await ds.createActivity(prospect1.id, {
+    activityType: "meeting",
+    source: "manual",
+    date: "2026-02-24",
+    time: "16:00",
+    outcome: "connected",
+    detail: "Test meeting for provider test kit",
+    documentsAttached: [],
+    loggedById: "u-chad",
+    annotation: null,
+  });
+
+  // Create a lead source
+  await ds.createLeadSource({ label: "Velocis Network" });
+}
+
 // ─── Main ───
 
 async function main() {
   console.log("🧪 OwnEZ CRM — Provider Test Kit");
   console.log(`   Provider: ${process.env.DATA_PROVIDER || "mock"}`);
   console.log("   Tests call DataService methods directly (no browser needed)\n");
+
+  await seedTestData();
 
   await testPeople();
   await testActivities();
