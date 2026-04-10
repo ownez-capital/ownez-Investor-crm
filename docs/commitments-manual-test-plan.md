@@ -27,8 +27,8 @@ The mock provider's default seed already includes 12 prospects across stages. Fo
 |---|---|---|
 | **Robert Calloway** | Prospect in Active Engagement | Has an open Next Action "Follow up — Q3 deck" due 2 days ago |
 | **Marcus Johnson** | Prospect in Pitch | Has an open Next Action due 5 days from now (future) |
-| **Sarah Kim** | Prospect in Initial Contact | Never had a Next Action set yet (only "Prospect Added") |
-| **David Chen** | Prospect in Soft Commit | Two open Next Actions (multi-commitment edge case) — one overdue by 1 day, one due today |
+| **Sandra Kim** | Prospect in Initial Contact | Never had a Next Action set yet (only "Prospect Added") |
+| **David Thornton** | Prospect in Soft Commit | Two open Next Actions (multi-commitment edge case) — one overdue by 1 day, one due today |
 | **Any lead** | N/A | At least one lead available that can be marked Dead and then resurrected |
 
 If any of these fixtures don't exist in the mock seed, **create them as part of the test plan preflight** by logging activities / setting next actions using the UI before running the main scenarios.
@@ -50,10 +50,10 @@ These scenarios confirm that **Chad's normal flow is unchanged** for the majorit
 
 ### Scenario 1A — First activity on a fresh prospect
 
-**Preconditions:** Sarah Kim has never had a Next Action set
+**Preconditions:** Sandra Kim has never had a Next Action set
 
 **Steps:**
-1. Open Sarah Kim's person detail page
+1. Open Sandra Kim's person detail page
 2. Focus Quick Log input
 3. Type: "Sent intro email, introducing the firm"
 4. Press Enter
@@ -211,10 +211,10 @@ These scenarios verify that the close-out prompt fires correctly and each of the
 
 ### Scenario 2E — Multiple open commitments (degenerate edge case)
 
-**Preconditions:** David Chen has two open commitments — one overdue by 1 day, one due today
+**Preconditions:** David Thornton has two open commitments — one overdue by 1 day, one due today
 
 **Steps:**
-1. Open David Chen's person detail page
+1. Open David Thornton's person detail page
 2. Quick Log: "Called David, discussed both the timeline and the doc question"
 3. Press Enter
 
