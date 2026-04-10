@@ -78,9 +78,19 @@ export const activities = pgTable(
     documentsAttached: jsonb("documents_attached").notNull().$type<string[]>(),
     loggedById: text("logged_by_id").notNull(),
     annotation: text("annotation"),
+    // ─── Commitments lifecycle (DESIGN-SPEC §5.9) ───
+    // All nullable; populated only on commitment_set rows (except
+    // fulfillsCommitmentId, which stamps the activity that fulfilled a commitment).
+    fulfillsCommitmentId: text("fulfills_commitment_id"),
+    commitmentType: text("commitment_type"),
+    commitmentDetail: text("commitment_detail"),
+    commitmentDueDate: text("commitment_due_date"),
+    commitmentStatus: text("commitment_status"),
+    commitmentClosedDate: text("commitment_closed_date"),
   },
   (table) => [
     index("activities_person_id_idx").on(table.personId),
+    index("activities_type_status_idx").on(table.activityType, table.commitmentStatus),
   ]
 );
 

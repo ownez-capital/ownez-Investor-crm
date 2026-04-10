@@ -77,6 +77,16 @@ export async function runMigrations(db: NeonDb): Promise<void> {
     )
   `);
 
+  // ─── Commitments lifecycle columns (DESIGN-SPEC §5.9) ───
+  // Additive, nullable, safe to run on live data. The feature flag COMMITMENTS_V2
+  // is OFF by default, so these columns are written/read only when the flag is on.
+  await db.execute(sql`ALTER TABLE activities ADD COLUMN IF NOT EXISTS fulfills_commitment_id TEXT`);
+  await db.execute(sql`ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_type TEXT`);
+  await db.execute(sql`ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_detail TEXT`);
+  await db.execute(sql`ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_due_date TEXT`);
+  await db.execute(sql`ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_status TEXT`);
+  await db.execute(sql`ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_closed_date TEXT`);
+
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS funding_entities (
       id TEXT PRIMARY KEY,
@@ -160,6 +170,7 @@ export async function runMigrations(db: NeonDb): Promise<void> {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS people_organization_id_idx ON people (organization_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS people_assigned_rep_id_idx ON people (assigned_rep_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS activities_person_id_idx ON activities (person_id)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS activities_type_status_idx ON activities (activity_type, commitment_status)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS funding_entities_person_id_idx ON funding_entities (person_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS funded_investments_person_id_idx ON funded_investments (person_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS funded_investments_funding_entity_id_idx ON funded_investments (funding_entity_id)`);
