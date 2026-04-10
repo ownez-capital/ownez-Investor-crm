@@ -10,6 +10,7 @@ import type {
 import { ACTIVE_PIPELINE_STAGES, COMMITTED_STAGES, TOUCH_ACTIVITY_TYPES, LEAD_SOURCES, PIPELINE_STAGES } from "../constants";
 import { computeDaysSinceLastTouch, computeIsStale, computeIsOverdue } from "../stale";
 import { getTodayCT } from "../format";
+import { isCommitmentsV2Enabled } from "../feature-flags";
 import { hashSync } from "bcryptjs";
 
 // ─── Password hashes ───
@@ -418,8 +419,29 @@ function enrichPerson(person: Person): PersonWithComputed {
   const personActivities = activities.filter((a) => a.personId === person.id);
   const today = getTodayCT();
   const daysSinceLastTouch = computeDaysSinceLastTouch(personActivities, today);
-  const isStale = computeIsStale(person.pipelineStage, daysSinceLastTouch, person.nextActionDate, today);
-  const isOverdue = computeIsOverdue(person.pipelineStage, person.nextActionDate, today);
+
+  // Commitments v2: when the flag is on, overdue/stale are driven by open
+  // commitment rows instead of the Person-level nextActionDate. When off,
+  // pass null to preserve the legacy behavior byte-for-byte.
+  // Feature flag removal: see docs/feature-flag-removal-checklist.md.
+  const openCommitmentsForStale = isCommitmentsV2Enabled()
+    ? personActivities.filter(
+        (a) => a.activityType === "commitment_set" && a.commitmentStatus === "open"
+      )
+    : null;
+  const isStale = computeIsStale(
+    person.pipelineStage,
+    daysSinceLastTouch,
+    person.nextActionDate,
+    openCommitmentsForStale,
+    today
+  );
+  const isOverdue = computeIsOverdue(
+    person.pipelineStage,
+    person.nextActionDate,
+    openCommitmentsForStale,
+    today
+  );
 
   const org = person.organizationId
     ? organizations.find((o) => o.id === person.organizationId)

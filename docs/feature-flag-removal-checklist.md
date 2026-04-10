@@ -26,7 +26,10 @@ Keep this list exhaustive. Every new `isCommitmentsV2Enabled()` call must be add
 
 | # | File | Purpose | Status |
 |---|---|---|---|
-|   |     | (to be filled in as implementation progresses) |   |
+| 1 | `lib/providers/mock.ts` (`enrichPerson`) | Picks v2 vs legacy stale/overdue source (open commitments vs `nextActionDate`) | Added in checkpoint 2c |
+| 2 | `lib/providers/neon/queries/people.ts` (`enrichPerson`) | Same as #1 for Neon provider getPeople/getPerson path | Added in checkpoint 2c |
+| 3 | `lib/providers/neon/queries/relationships.ts` (`enrichPerson`) | Same as #1 for referrals/related contacts path | Added in checkpoint 2c |
+| 4 | `lib/providers/neon/queries/leadership.ts` (`enrichPerson`) | Same as #1 for leadership dashboard/drilldown/red-flags path | Added in checkpoint 2c |
 
 ## Verification before removal
 
