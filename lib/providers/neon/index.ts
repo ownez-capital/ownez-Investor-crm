@@ -4,6 +4,7 @@ import { runMigrations } from "./migrate";
 import { seedDatabase } from "./seed";
 import * as peopleQueries from "./queries/people";
 import * as activitiesQueries from "./queries/activities";
+import * as commitmentsQueries from "./queries/commitments";
 import * as organizationsQueries from "./queries/organizations";
 import * as fundingQueries from "./queries/funding";
 import * as leadershipQueries from "./queries/leadership";
@@ -249,29 +250,23 @@ export function createNeonDataService(): DataService {
     },
 
     // ─── Commitments lifecycle (DESIGN-SPEC §5.9) ───
-    // Checkpoint 1: Neon provider stubs these until the schema migration adding
-    // commitment columns lands. If anything tries to call them against Neon
-    // before then, it will fail loudly — which is the protection we want while
-    // the feature flag is off.
-    async getOpenCommitments(_personId) {
-      throw new Error(
-        "Commitments feature not yet available on Neon provider — schema migration pending (see docs/feature-flag-removal-checklist.md)"
-      );
+    // Real implementations; gated behind COMMITMENTS_V2 at the API route layer.
+    // The underlying columns are nullable and unused when the flag is off.
+    async getOpenCommitments(personId) {
+      await ensureInitialized();
+      return commitmentsQueries.getOpenCommitments(db, personId);
     },
-    async createCommitment(_personId, _data) {
-      throw new Error(
-        "Commitments feature not yet available on Neon provider — schema migration pending"
-      );
+    async createCommitment(personId, data) {
+      await ensureInitialized();
+      return commitmentsQueries.createCommitment(db, personId, data);
     },
-    async closeOutCommitment(_commitmentId, _resolution) {
-      throw new Error(
-        "Commitments feature not yet available on Neon provider — schema migration pending"
-      );
+    async closeOutCommitment(commitmentId, resolution) {
+      await ensureInitialized();
+      return commitmentsQueries.closeOutCommitment(db, commitmentId, resolution);
     },
-    async dropLead(_personId, _data) {
-      throw new Error(
-        "Drop Lead feature not yet available on Neon provider — schema migration pending"
-      );
+    async dropLead(personId, data) {
+      await ensureInitialized();
+      return commitmentsQueries.dropLead(db, personId, data);
     },
 
     // ─── Testing ───

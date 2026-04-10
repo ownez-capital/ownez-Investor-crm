@@ -1,14 +1,17 @@
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import type { NeonDb } from "../db";
 import * as schema from "../schema";
-import type { Activity, ActivityFilters, RecentActivityFilters, RecentActivityEntry } from "../../../types";
+import type {
+  Activity,
+  ActivityFilters,
+  RecentActivityFilters,
+  RecentActivityEntry,
+  CommitmentStatus,
+  NextActionType,
+} from "../../../types";
 import { getTodayCT } from "../../../format";
 
-function rowToActivity(row: typeof schema.activities.$inferSelect): Activity {
-  // Checkpoint 1: commitment columns don't exist in Neon schema yet.
-  // The migration adding them lands in the next phase (see
-  // docs/feature-flag-removal-checklist.md and DESIGN-SPEC §5.9).
-  // Until then, commitment fields are always null from Neon.
+export function rowToActivity(row: typeof schema.activities.$inferSelect): Activity {
   return {
     id: row.id,
     personId: row.personId,
@@ -21,12 +24,12 @@ function rowToActivity(row: typeof schema.activities.$inferSelect): Activity {
     documentsAttached: row.documentsAttached as string[],
     loggedById: row.loggedById,
     annotation: row.annotation,
-    fulfillsCommitmentId: null,
-    commitmentType: null,
-    commitmentDetail: null,
-    commitmentDueDate: null,
-    commitmentStatus: null,
-    commitmentClosedDate: null,
+    fulfillsCommitmentId: row.fulfillsCommitmentId,
+    commitmentType: row.commitmentType as NextActionType | null,
+    commitmentDetail: row.commitmentDetail,
+    commitmentDueDate: row.commitmentDueDate,
+    commitmentStatus: row.commitmentStatus as CommitmentStatus | null,
+    commitmentClosedDate: row.commitmentClosedDate,
   };
 }
 
@@ -111,8 +114,19 @@ export async function createActivity(
   const id = crypto.randomUUID();
 
   await db.execute(
-    sql`INSERT INTO activities (id, person_id, activity_type, source, date, time, outcome, detail, documents_attached, logged_by_id, annotation)
-    VALUES (${id}, ${personId}, ${data.activityType}, ${data.source}, ${data.date}, ${data.time}, ${data.outcome}, ${data.detail}, ${JSON.stringify(data.documentsAttached)}::jsonb, ${data.loggedById}, ${data.annotation})`
+    sql`INSERT INTO activities (
+      id, person_id, activity_type, source, date, time, outcome, detail,
+      documents_attached, logged_by_id, annotation,
+      fulfills_commitment_id, commitment_type, commitment_detail,
+      commitment_due_date, commitment_status, commitment_closed_date
+    )
+    VALUES (
+      ${id}, ${personId}, ${data.activityType}, ${data.source}, ${data.date},
+      ${data.time}, ${data.outcome}, ${data.detail},
+      ${JSON.stringify(data.documentsAttached)}::jsonb, ${data.loggedById}, ${data.annotation},
+      ${data.fulfillsCommitmentId}, ${data.commitmentType}, ${data.commitmentDetail},
+      ${data.commitmentDueDate}, ${data.commitmentStatus}, ${data.commitmentClosedDate}
+    )`
   );
 
   const rows = await db.select().from(schema.activities).where(eq(schema.activities.id, id)).limit(1);
