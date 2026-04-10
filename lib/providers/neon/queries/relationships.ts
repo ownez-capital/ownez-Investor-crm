@@ -76,6 +76,10 @@ async function enrichPerson(db: NeonDb, person: Person): Promise<PersonWithCompu
     TOUCH_ACTIVITY_TYPES.includes(a.activityType)
   ).length;
 
+  const openCommitmentCount = activitiesTyped.filter(
+    (a) => a.activityType === "commitment_set" && a.commitmentStatus === "open"
+  ).length;
+
   return {
     ...person,
     organizationName,
@@ -85,6 +89,7 @@ async function enrichPerson(db: NeonDb, person: Person): Promise<PersonWithCompu
     isOverdue,
     activityCount,
     referrerName,
+    openCommitmentCount,
   };
 }
 

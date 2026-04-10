@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getDataService } from "@/lib/data";
 import { requireSession } from "@/lib/auth";
 import { getTodayCT } from "@/lib/format";
+import { EMPTY_COMMITMENT_FIELDS } from "@/lib/types";
 
 export async function PATCH(
   request: NextRequest,
@@ -46,6 +47,7 @@ export async function PATCH(
       documentsAttached: [],
       loggedById: session.userId,
       annotation: null,
+      ...EMPTY_COMMITMENT_FIELDS,
     });
 
     revalidatePath(`/person/${id}`);

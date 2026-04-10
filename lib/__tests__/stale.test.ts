@@ -17,6 +17,12 @@ function makeActivity(overrides: Partial<Activity> = {}): Activity {
     documentsAttached: [],
     loggedById: "u1",
     annotation: null,
+    fulfillsCommitmentId: null,
+    commitmentType: null,
+    commitmentDetail: null,
+    commitmentDueDate: null,
+    commitmentStatus: null,
+    commitmentClosedDate: null,
     ...overrides,
   };
 }

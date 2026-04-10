@@ -4,6 +4,7 @@ import { getDataService } from "@/lib/data";
 import { requireSession } from "@/lib/auth";
 import { getTodayCT } from "@/lib/format";
 import { STAGE_LABELS } from "@/lib/constants";
+import { EMPTY_COMMITMENT_FIELDS } from "@/lib/types";
 
 export async function POST(
   request: NextRequest,
@@ -87,6 +88,7 @@ export async function POST(
       documentsAttached: [],
       loggedById: session.userId,
       annotation: null,
+      ...EMPTY_COMMITMENT_FIELDS,
     });
 
     revalidatePath(`/person/${id}`);

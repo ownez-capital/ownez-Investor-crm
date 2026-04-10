@@ -248,6 +248,32 @@ export function createNeonDataService(): DataService {
       return adminQueries.createActivityType(db, data);
     },
 
+    // ─── Commitments lifecycle (DESIGN-SPEC §5.9) ───
+    // Checkpoint 1: Neon provider stubs these until the schema migration adding
+    // commitment columns lands. If anything tries to call them against Neon
+    // before then, it will fail loudly — which is the protection we want while
+    // the feature flag is off.
+    async getOpenCommitments(_personId) {
+      throw new Error(
+        "Commitments feature not yet available on Neon provider — schema migration pending (see docs/feature-flag-removal-checklist.md)"
+      );
+    },
+    async createCommitment(_personId, _data) {
+      throw new Error(
+        "Commitments feature not yet available on Neon provider — schema migration pending"
+      );
+    },
+    async closeOutCommitment(_commitmentId, _resolution) {
+      throw new Error(
+        "Commitments feature not yet available on Neon provider — schema migration pending"
+      );
+    },
+    async dropLead(_personId, _data) {
+      throw new Error(
+        "Drop Lead feature not yet available on Neon provider — schema migration pending"
+      );
+    },
+
     // ─── Testing ───
     // resetData is NOT implemented for Neon provider
   };

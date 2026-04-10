@@ -85,6 +85,10 @@ async function enrichPerson(db: NeonDb, person: Person): Promise<PersonWithCompu
     TOUCH_ACTIVITY_TYPES.includes(a.activityType as Activity["activityType"])
   ).length;
 
+  const openCommitmentCount = activitiesTyped.filter(
+    (a) => a.activityType === "commitment_set" && a.commitmentStatus === "open"
+  ).length;
+
   return {
     ...person,
     organizationName,
@@ -94,6 +98,7 @@ async function enrichPerson(db: NeonDb, person: Person): Promise<PersonWithCompu
     isOverdue,
     activityCount,
     referrerName,
+    openCommitmentCount,
   };
 }
 
@@ -266,6 +271,12 @@ export async function getDrilldownActivities(db: NeonDb, filter: DrilldownActivi
       documentsAttached: a.documentsAttached as string[],
       loggedById: a.loggedById,
       annotation: a.annotation,
+      fulfillsCommitmentId: null,
+      commitmentType: null,
+      commitmentDetail: null,
+      commitmentDueDate: null,
+      commitmentStatus: null,
+      commitmentClosedDate: null,
       personName: personMap.get(a.personId) ?? "Unknown",
     }));
 }

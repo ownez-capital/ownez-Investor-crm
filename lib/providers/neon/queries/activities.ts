@@ -5,6 +5,10 @@ import type { Activity, ActivityFilters, RecentActivityFilters, RecentActivityEn
 import { getTodayCT } from "../../../format";
 
 function rowToActivity(row: typeof schema.activities.$inferSelect): Activity {
+  // Checkpoint 1: commitment columns don't exist in Neon schema yet.
+  // The migration adding them lands in the next phase (see
+  // docs/feature-flag-removal-checklist.md and DESIGN-SPEC §5.9).
+  // Until then, commitment fields are always null from Neon.
   return {
     id: row.id,
     personId: row.personId,
@@ -17,6 +21,12 @@ function rowToActivity(row: typeof schema.activities.$inferSelect): Activity {
     documentsAttached: row.documentsAttached as string[],
     loggedById: row.loggedById,
     annotation: row.annotation,
+    fulfillsCommitmentId: null,
+    commitmentType: null,
+    commitmentDetail: null,
+    commitmentDueDate: null,
+    commitmentStatus: null,
+    commitmentClosedDate: null,
   };
 }
 

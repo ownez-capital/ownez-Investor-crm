@@ -156,6 +156,12 @@ async function testActivities() {
       documentsAttached: [],
       loggedById: "u-chad",
       annotation: null,
+      fulfillsCommitmentId: null,
+      commitmentType: null,
+      commitmentDetail: null,
+      commitmentDueDate: null,
+      commitmentStatus: null,
+      commitmentClosedDate: null,
     });
     assertType(activity.id, "string", "id");
     assert(activity.activityType === "call", "type should be call");
@@ -430,6 +436,12 @@ async function seedTestData() {
     documentsAttached: [],
     loggedById: "u-chad",
     annotation: null,
+    fulfillsCommitmentId: null,
+    commitmentType: null,
+    commitmentDetail: null,
+    commitmentDueDate: null,
+    commitmentStatus: null,
+    commitmentClosedDate: null,
   });
 
   // Create a lead source
