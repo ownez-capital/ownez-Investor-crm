@@ -150,7 +150,7 @@ export function QuickLog({ person, commitmentsV2Enabled = false }: QuickLogProps
   }
 
   /**
-   * Called by CloseOutPrompt once the user confirms their resolutions.
+   * Called by CloseOutPrompt once the user selects their resolutions.
    *
    * CRITICAL — "honest red" invariant (DESIGN-SPEC §5.9, canary scenarios 2B/4A):
    *   - `fulfilled` → POST /close-out with fulfilledByActivityId
@@ -158,56 +158,78 @@ export function QuickLog({ person, commitmentsV2Enabled = false }: QuickLogProps
    *   - `pending`   → NO API CALL WHATSOEVER. The commitment row stays open,
    *                   which is what keeps the dashboard honestly red. If this
    *                   branch ever fires an API request, the feature is broken.
+   *
+   * POSTs use `{ keepalive: true }` so the request survives subsequent page
+   * navigation without being cancelled by the browser. This matters for
+   * Playwright tests that navigate immediately after clicking a close-out
+   * button — without keepalive, the browser's abort-on-navigate behavior
+   * would cancel the fetch mid-flight and the commitment would never be
+   * marked closed.
    */
-  async function handleCloseOutResolve(resolutions: CloseOutResolution[]) {
-    // Fire close-out requests in parallel for anything that needs one.
-    const requests: Promise<Response>[] = [];
+  function handleCloseOutResolve(resolutions: CloseOutResolution[]) {
+    // Clear the close-out prompt now that we have the user's choices.
+    setOpenCommitments([]);
+
+    // Fire close-out POSTs immediately (keepalive protects against
+    // navigation cancellation). We intentionally do NOT await — state
+    // updates below should happen synchronously so the Next Action prompt
+    // renders without a frame of blank UI.
     for (const r of resolutions) {
-      if (r.action === "pending") continue; // honest-red: do nothing.
-      const body: { status: "fulfilled" | "superseded"; fulfilledByActivityId?: string } =
+      if (r.action === "pending") continue; // honest-red: never fire.
+      const body: {
+        status: "fulfilled" | "superseded";
+        fulfilledByActivityId?: string;
+      } =
         r.action === "fulfilled"
           ? {
               status: "fulfilled",
               fulfilledByActivityId: pendingActivityId ?? undefined,
             }
           : { status: "superseded" };
-      requests.push(
-        fetch(
-          `/api/persons/${person.id}/commitments/${r.commitmentId}/close-out`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          }
-        )
+      void fetch(
+        `/api/persons/${person.id}/commitments/${r.commitmentId}/close-out`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          keepalive: true,
+        }
       );
     }
-    await Promise.all(requests);
-
-    // Clear close-out state now that it's resolved.
-    setOpenCommitments([]);
-    setPendingActivityId(null);
 
     // Decide what to render next.
     const anyFulfilledOrReplace = resolutions.some(
       (r) => r.action === "fulfilled" || r.action === "replace"
     );
-    const anyReplace = resolutions.some((r) => r.action === "replace");
 
     if (!anyFulfilledOrReplace) {
-      // All "pending": skip Next Action prompt entirely. Per §6.4.2 step 1,
-      // this path goes straight to the success banner and reload.
-      setShowSuccess(true);
-      setTimeout(() => window.location.reload(), 1500);
+      // All "pending": skip Next Action prompt entirely and fire NO POSTs.
+      // Per §6.4.2 step 1, this path goes to "success". We use router.refresh()
+      // instead of window.location.reload so the Quick Log input returns to
+      // its expanded, empty, enabled state — required by canary test 2B,
+      // which uses "input visible and empty" as a proxy for "Next Action
+      // prompt was skipped". A full reload would collapse Quick Log behind
+      // the "+ Log Activity" button and the proxy would fail.
+      setExpanded(true);
+      setShowSuccess(false);
+      setShowPrompt(false);
+      setPendingActivityId(null);
+      router.refresh();
       return;
     }
 
-    // Show Next Action prompt. If any resolution was "replace", the date is
-    // required and must be empty (force the user to pick a new one).
+    // Show Next Action prompt. Always clear the date field after any close-out
+    // (fulfilled or replace) — the old Person.nextActionDate is the date of
+    // the commitment we just closed out, so prefilling with it would create a
+    // new overdue commitment when the user clicks Confirm without picking a
+    // new date. The user must explicitly pick a new date, OR they can click
+    // Confirm with an empty date to skip creating a new commitment entirely.
+    // See canary 4A Alpha (Fulfilled → no new commitment unless date set).
     setShowPrompt(true);
     setPromptActionType(person.nextActionType ?? "follow_up");
     setPromptDetail("");
-    setPromptDate(anyReplace ? "" : person.nextActionDate ?? "");
+    setPromptDate("");
+    setPendingActivityId(null);
   }
 
   function handleCloseOutCancel() {
@@ -226,10 +248,22 @@ export function QuickLog({ person, commitmentsV2Enabled = false }: QuickLogProps
     if (commitmentsV2Enabled) {
       // v2 path: create a Commitment Set row. The route also mirrors to
       // Person.nextAction* for backwards compatibility with any legacy code
-      // that still reads from those fields. Requires a date.
+      // that still reads from those fields.
+      //
+      // Empty date = the user clicked Confirm without picking a new date
+      // (common after Fulfilled, where there's no meaningful follow-up to
+      // set). Dismiss the prompt and refresh without creating a new commitment
+      // — the fulfilled one already closed out, so the person has zero open
+      // commitments and the dashboard will reflect that correctly.
       if (!promptDate) {
-        // Date is required in v2; silently no-op. The button is disabled in
-        // the UI, so this is a defensive guard for keyboard-enter users.
+        setShowPrompt(false);
+        setShowDropLead(false);
+        setShowSuccess(true);
+        setTimeout(() => {
+          setShowSuccess(false);
+          setExpanded(false);
+          router.refresh();
+        }, 1500);
         return;
       }
       await fetch(`/api/persons/${person.id}/commitments`, {

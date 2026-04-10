@@ -149,10 +149,22 @@ export function quickLogInput(page: Page) {
 /**
  * Type an activity into Quick Log and press Enter. Does NOT advance past any
  * subsequent prompts (close-out or Next Action) — callers handle those.
+ *
+ * Quick Log renders as a collapsed "+ Log Activity" button by default; we
+ * click it to reveal the input if the input isn't already present.
  */
 export async function logActivity(page: Page, personId: string, text: string) {
   await page.goto(`/person/${personId}`);
   const input = quickLogInput(page);
+  if (!(await input.isVisible().catch(() => false))) {
+    // Click the collapsed "+ Log Activity" button to reveal the input. Use
+    // .first() to disambiguate from the sticky-header "Quick log" trigger,
+    // and rely on click()'s own actionability wait.
+    await page
+      .getByRole("button", { name: /log activity/i })
+      .first()
+      .click();
+  }
   await expect(input).toBeVisible();
   await input.fill(text);
   await input.press("Enter");

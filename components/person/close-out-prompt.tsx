@@ -21,8 +21,14 @@ export interface CloseOutPromptProps {
    * Will almost always be length 1; length > 1 is a degenerate recovery case.
    */
   openCommitments: Activity[];
-  /** Called once the user confirms resolutions for every commitment. */
-  onResolve: (resolutions: CloseOutResolution[]) => void;
+  /**
+   * Called once the user confirms resolutions for every commitment.
+   * May be async; the component will await it so that the parent's
+   * post-resolution state updates (like showing the Next Action prompt) run
+   * before the button click returns, avoiding races with Playwright tests
+   * that assert on the next state immediately after the click.
+   */
+  onResolve: (resolutions: CloseOutResolution[]) => void | Promise<void>;
   /** Called when the user abandons the prompt. */
   onCancel: () => void;
 }
@@ -99,12 +105,29 @@ export function CloseOutPrompt({
     setResolutions((prev) => ({ ...prev, [commitmentId]: action }));
   }
 
-  function handleConfirm() {
+  async function resolveWith(nextResolutions: Record<string, ResolutionAction>) {
     const payload: CloseOutResolution[] = openCommitments.map((c) => ({
       commitmentId: c.id,
-      action: resolutions[c.id] ?? "pending",
+      action: nextResolutions[c.id] ?? "pending",
     }));
-    onResolve(payload);
+    await onResolve(payload);
+  }
+
+  async function handleConfirm() {
+    await resolveWith(resolutions);
+  }
+
+  /**
+   * Clicking F/P/R on a SINGLE-commitment prompt is the submit — the user's
+   * choice is unambiguous and requiring a second click on Confirm is friction.
+   * Multi-commitment mode still requires an explicit Confirm click so the
+   * user can set each commitment independently before submitting.
+   */
+  async function handleActionClick(commitmentId: string, action: ResolutionAction) {
+    setAction(commitmentId, action);
+    if (isSingle) {
+      await resolveWith({ ...resolutions, [commitmentId]: action });
+    }
   }
 
   // Keyboard: F/P/R choose, Enter confirms. For multi-commitment case the hotkeys
@@ -206,7 +229,7 @@ export function CloseOutPrompt({
                       type="button"
                       data-testid={testid}
                       aria-pressed={active}
-                      onClick={() => setAction(c.id, meta.key)}
+                      onClick={() => handleActionClick(c.id, meta.key)}
                       className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                         active
                           ? "bg-gold text-navy"
