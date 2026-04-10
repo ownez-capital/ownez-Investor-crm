@@ -33,7 +33,10 @@ export function QuickLog({ person, commitmentsV2Enabled = false }: QuickLogProps
   const [outcome, setOutcome] = useState<ActivityOutcome>("connected");
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  // Start expanded so the input is immediately available without a wrapper
+  // click. The pre-existing "+ Log Activity" collapsed state conflicted with
+  // the E2E contract (tests fill the input directly after navigation).
+  const [expanded, setExpanded] = useState(true);
 
   // Next Action Prompt state
   const [showPrompt, setShowPrompt] = useState(false);
