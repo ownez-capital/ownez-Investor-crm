@@ -85,49 +85,55 @@ Before any schema change, take a Neon branch snapshot for instant rollback.
 
 Adds 6 nullable columns + 1 index to the `activities` table. All additive. Zero downtime. Running with the flag OFF means nothing reads these columns yet.
 
-### 1.1 Generate the migration file (one-time, already committed to branch)
+### 1.1 How this project applies migrations (important)
 
-If the `drizzle/` directory in the branch already contains the migration SQL for the commitment columns, **skip to 1.2**. Otherwise generate it locally first:
+**This project does NOT use `drizzle-kit generate` / `drizzle-kit push`.** There is no `drizzle/` directory and no generated SQL migration files. Schema evolution happens via idempotent `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE IF NOT EXISTS` statements in `lib/providers/neon/migrate.ts`, which are normally triggered lazily on the first DataService call via `ensureInitialized()`.
 
-```bash
-cd "C:/Users/erezg/Documents/OwnEZ CRM"
-npx drizzle-kit generate
-```
+For production go-live we apply the migration **explicitly before traffic arrives** using `scripts/apply-neon-migrations.ts`. This avoids the race where the first cold-start runs the ALTER at the same time as a real request.
 
-**Expected:** a new SQL file appears under `drizzle/` named something like `NNNN_xxx_xxx.sql`, containing `ALTER TABLE activities ADD COLUMN ...` for the 6 new columns and a `CREATE INDEX` statement.
+### 1.2 Inspect the ALTER statements before running
 
-**Stop if:** the generated SQL contains any `DROP`, `RENAME`, or a destructive change to existing columns. Something upstream is wrong.
+Open `lib/providers/neon/migrate.ts` and confirm the commitment-columns block (grep for `commitment_`) only contains:
 
-### 1.2 Inspect the migration SQL
+- `ALTER TABLE activities ADD COLUMN IF NOT EXISTS fulfills_commitment_id TEXT`
+- `ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_type TEXT`
+- `ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_detail TEXT`
+- `ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_due_date TEXT`
+- `ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_status TEXT`
+- `ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_closed_date TEXT`
+- `CREATE INDEX IF NOT EXISTS activities_type_status_idx ON activities (activity_type, commitment_status)`
 
-Open the generated file in your editor. Confirm it only contains:
-
-- `ALTER TABLE "activities" ADD COLUMN "fulfills_commitment_id" text;`
-- `ALTER TABLE "activities" ADD COLUMN "commitment_type" text;`
-- `ALTER TABLE "activities" ADD COLUMN "commitment_detail" text;`
-- `ALTER TABLE "activities" ADD COLUMN "commitment_due_date" text;`
-- `ALTER TABLE "activities" ADD COLUMN "commitment_status" text;`
-- `ALTER TABLE "activities" ADD COLUMN "commitment_closed_date" text;`
-- `CREATE INDEX ... ON "activities" ("activity_type", "commitment_status");`
-
-**Stop if:** the migration does anything else. Nothing else should be in this migration.
+**Stop if:** the file contains any `DROP`, `RENAME`, or destructive change. The migration must be additive only.
 
 ### 1.3 Apply the migration to production Neon
 
+**First make sure `.env.local` is pointing at the production Neon URL** (not dev) — check `DATABASE_URL`. When in doubt, run the production URL through a throwaway `psql` and confirm you're looking at the right database.
+
 ```bash
 cd "C:/Users/erezg/Documents/OwnEZ CRM"
-npx drizzle-kit push
+npx tsx --env-file=.env.local scripts/apply-neon-migrations.ts
 ```
 
-(If the project has `db:migrate` or similar in package.json scripts, use that instead — check `scripts` in `package.json`.)
-
-**Expected:** output similar to:
+**Expected output:**
 ```
-[✓] Changes applied
-```
-No errors.
+▶ Applying runMigrations(db)…
+  ✅ runMigrations completed
+▶ Verifying commitment columns on activities table…
+  ✅ fulfills_commitment_id (text, nullable=YES)
+  ✅ commitment_type (text, nullable=YES)
+  ✅ commitment_detail (text, nullable=YES)
+  ✅ commitment_due_date (text, nullable=YES)
+  ✅ commitment_status (text, nullable=YES)
+  ✅ commitment_closed_date (text, nullable=YES)
+▶ Verifying activities_type_status_idx…
+  ✅ activities_type_status_idx → CREATE INDEX activities_type_status_idx ON public.activities USING btree (activity_type, commitment_status)
 
-**Stop if:** any error. Do not proceed. See rollback in 1.5.
+✅ All migrations applied and verified.
+```
+
+**Stop if:** any `❌` line appears, or the script exits non-zero, or the verification step prints `MISSING`. Do not proceed. See rollback in 1.5.
+
+Note: the script is safe to re-run. It uses `IF NOT EXISTS` everywhere, so running it twice is a no-op.
 
 ### 1.4 Verify the columns exist
 
