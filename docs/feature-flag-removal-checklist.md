@@ -33,6 +33,7 @@ Keep this list exhaustive. Every new `isCommitmentsV2Enabled()` call must be add
 | 5 | `app/api/persons/[id]/commitments/route.ts` (POST) | Returns 501 when flag off; creates Commitment Set + mirrors to Person.nextAction* when on | Added in checkpoint 2d |
 | 6 | `app/api/persons/[id]/commitments/[commitmentId]/close-out/route.ts` (POST) | Returns 501 when flag off; transitions commitment to fulfilled/superseded/cancelled when on | Added in checkpoint 2d |
 | 7 | `app/api/persons/[id]/drop-lead/route.ts` (POST) | Returns 501 when flag off; atomic drop-lead (stage + cancel commitments + stage_change activity) when on | Added in checkpoint 2d |
+| 8 | `app/api/persons/[id]/commitments/route.ts` (GET) | Returns 501 when flag off; returns list of open Commitment Set rows when on | Added in checkpoint 3 |
 
 ## Verification before removal
 
