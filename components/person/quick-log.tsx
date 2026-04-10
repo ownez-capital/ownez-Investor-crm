@@ -9,13 +9,22 @@ import { detectActivityType, detectOutcome, hasOutcome } from "@/lib/smart-detec
 import { ACTIVITY_TYPES, NEXT_ACTION_TYPES } from "@/lib/constants";
 import { getTodayCT } from "@/lib/format";
 import { DateQuickPick } from "@/components/ui/date-quick-pick";
-import type { PersonWithComputed, ActivityType, ActivityOutcome } from "@/lib/types";
+import { CloseOutPrompt, type CloseOutResolution } from "@/components/person/close-out-prompt";
+import { DropLeadPanel, type DropLeadData } from "@/components/person/drop-lead-panel";
+import type { PersonWithComputed, ActivityType, ActivityOutcome, Activity } from "@/lib/types";
 
 interface QuickLogProps {
   person: PersonWithComputed;
+  /**
+   * Whether the commitments-v2 flow is enabled. When true, post-activity
+   * fetches open commitments and runs the 3-step (close-out → Next Action →
+   * success) flow from DESIGN-SPEC §6.4.2. When false, runs the legacy
+   * PATCH /next-action path unchanged.
+   */
+  commitmentsV2Enabled?: boolean;
 }
 
-export function QuickLog({ person }: QuickLogProps) {
+export function QuickLog({ person, commitmentsV2Enabled = false }: QuickLogProps) {
   const router = useRouter();
   const [text, setText] = useState("");
   const [showMore, setShowMore] = useState(false);
@@ -31,6 +40,14 @@ export function QuickLog({ person }: QuickLogProps) {
   const [promptActionType, setPromptActionType] = useState(person.nextActionType ?? "follow_up");
   const [promptDetail, setPromptDetail] = useState("");
   const [promptDate, setPromptDate] = useState(person.nextActionDate ?? "");
+  const [showDropLead, setShowDropLead] = useState(false);
+
+  // Commitments v2 close-out state — the activity we just logged (whose id we
+  // need to stamp on any "fulfilled" resolution) and the open commitments that
+  // are past-due-or-today (<=). If openCommitments is non-empty, render the
+  // CloseOutPrompt before the Next Action prompt. See DESIGN-SPEC §6.4.2.
+  const [pendingActivityId, setPendingActivityId] = useState<string | null>(null);
+  const [openCommitments, setOpenCommitments] = useState<Activity[]>([]);
 
   const detectedType = text ? detectActivityType(text) : "note";
   const detectedOutcome = text ? detectOutcome(text) : "connected";
@@ -46,7 +63,7 @@ export function QuickLog({ person }: QuickLogProps) {
       const now = new Date();
       const currentTime = now.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", timeZone: "America/Chicago" });
 
-      await fetch("/api/activities", {
+      const res = await fetch("/api/activities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -62,6 +79,18 @@ export function QuickLog({ person }: QuickLogProps) {
         }),
       });
 
+      // Capture the created activity id — we need it to stamp on any
+      // "fulfilled" resolution in the close-out step.
+      let createdActivityId: string | null = null;
+      if (res.ok) {
+        try {
+          const body = await res.json();
+          createdActivityId = body?.activity?.id ?? body?.id ?? null;
+        } catch {
+          createdActivityId = null;
+        }
+      }
+
       // Reset log form
       setText("");
       setShowMore(false);
@@ -69,7 +98,46 @@ export function QuickLog({ person }: QuickLogProps) {
       setOutcome("connected");
       setExpanded(false);
 
-      // Show next action prompt — detail starts empty, old value as placeholder
+      // Commitments v2: fetch open commitments and decide whether to show the
+      // close-out prompt. Filter uses <= (NOT <) per DESIGN-SPEC §6.4.2 — a
+      // commitment due today triggers the prompt even though due-today is NOT
+      // overdue on the dashboard. The close-out prompt fires on dueDate <=
+      // today; the overdue flag fires on dueDate < today.
+      let shouldShowCloseOut = false;
+      if (commitmentsV2Enabled) {
+        try {
+          const commitmentsRes = await fetch(
+            `/api/persons/${person.id}/commitments`,
+            { method: "GET" }
+          );
+          if (commitmentsRes.ok) {
+            const opens = (await commitmentsRes.json()) as Activity[];
+            const today = getTodayCT();
+            const dueNowOrPast = opens.filter(
+              (c) => c.commitmentDueDate != null && c.commitmentDueDate <= today
+            );
+            if (dueNowOrPast.length > 0) {
+              setOpenCommitments(dueNowOrPast);
+              setPendingActivityId(createdActivityId);
+              shouldShowCloseOut = true;
+            }
+          }
+          // Non-ok (e.g. 501 if flag toggled off between render and submit) —
+          // fall through to the legacy Next Action prompt path below.
+        } catch {
+          // Network/parse error — degrade to legacy path.
+        }
+      }
+
+      if (shouldShowCloseOut) {
+        // Do NOT show Next Action prompt yet. CloseOutPrompt renders first;
+        // its onResolve handler calls the Next Action prompt (or skips it for
+        // the all-pending case).
+        router.refresh();
+        return;
+      }
+
+      // Legacy path / no overdue-or-today commitments: show Next Action prompt.
       setShowPrompt(true);
       setPromptActionType(person.nextActionType ?? "follow_up");
       setPromptDetail("");
@@ -81,19 +149,129 @@ export function QuickLog({ person }: QuickLogProps) {
     }
   }
 
-  async function handlePromptConfirm() {
-    await fetch(`/api/persons/${person.id}/next-action`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nextActionType: promptActionType,
-        nextActionDetail: promptDetail.trim() || person.nextActionDetail,
-        nextActionDate: promptDate,
-      }),
-    });
-    setShowPrompt(false);
+  /**
+   * Called by CloseOutPrompt once the user confirms their resolutions.
+   *
+   * CRITICAL — "honest red" invariant (DESIGN-SPEC §5.9, canary scenarios 2B/4A):
+   *   - `fulfilled` → POST /close-out with fulfilledByActivityId
+   *   - `replace`   → POST /close-out with status "superseded"
+   *   - `pending`   → NO API CALL WHATSOEVER. The commitment row stays open,
+   *                   which is what keeps the dashboard honestly red. If this
+   *                   branch ever fires an API request, the feature is broken.
+   */
+  async function handleCloseOutResolve(resolutions: CloseOutResolution[]) {
+    // Fire close-out requests in parallel for anything that needs one.
+    const requests: Promise<Response>[] = [];
+    for (const r of resolutions) {
+      if (r.action === "pending") continue; // honest-red: do nothing.
+      const body: { status: "fulfilled" | "superseded"; fulfilledByActivityId?: string } =
+        r.action === "fulfilled"
+          ? {
+              status: "fulfilled",
+              fulfilledByActivityId: pendingActivityId ?? undefined,
+            }
+          : { status: "superseded" };
+      requests.push(
+        fetch(
+          `/api/persons/${person.id}/commitments/${r.commitmentId}/close-out`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }
+        )
+      );
+    }
+    await Promise.all(requests);
+
+    // Clear close-out state now that it's resolved.
+    setOpenCommitments([]);
+    setPendingActivityId(null);
+
+    // Decide what to render next.
+    const anyFulfilledOrReplace = resolutions.some(
+      (r) => r.action === "fulfilled" || r.action === "replace"
+    );
+    const anyReplace = resolutions.some((r) => r.action === "replace");
+
+    if (!anyFulfilledOrReplace) {
+      // All "pending": skip Next Action prompt entirely. Per §6.4.2 step 1,
+      // this path goes straight to the success banner and reload.
+      setShowSuccess(true);
+      setTimeout(() => window.location.reload(), 1500);
+      return;
+    }
+
+    // Show Next Action prompt. If any resolution was "replace", the date is
+    // required and must be empty (force the user to pick a new one).
+    setShowPrompt(true);
+    setPromptActionType(person.nextActionType ?? "follow_up");
+    setPromptDetail("");
+    setPromptDate(anyReplace ? "" : person.nextActionDate ?? "");
+  }
+
+  function handleCloseOutCancel() {
+    // User dismissed the prompt without confirming — don't fire any API calls.
+    // Leave the activity logged as-is, clear close-out state, and show the
+    // success banner so the user has clear feedback that the activity saved.
+    setOpenCommitments([]);
+    setPendingActivityId(null);
     setShowSuccess(true);
     setTimeout(() => window.location.reload(), 1500);
+  }
+
+  async function handlePromptConfirm() {
+    const detail = promptDetail.trim() || person.nextActionDetail || "";
+
+    if (commitmentsV2Enabled) {
+      // v2 path: create a Commitment Set row. The route also mirrors to
+      // Person.nextAction* for backwards compatibility with any legacy code
+      // that still reads from those fields. Requires a date.
+      if (!promptDate) {
+        // Date is required in v2; silently no-op. The button is disabled in
+        // the UI, so this is a defensive guard for keyboard-enter users.
+        return;
+      }
+      await fetch(`/api/persons/${person.id}/commitments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          commitmentType: promptActionType,
+          commitmentDetail: detail,
+          commitmentDueDate: promptDate,
+        }),
+      });
+    } else {
+      // Legacy path: PATCH the person's next-action fields directly.
+      await fetch(`/api/persons/${person.id}/next-action`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nextActionType: promptActionType,
+          nextActionDetail: detail,
+          nextActionDate: promptDate,
+        }),
+      });
+    }
+
+    setShowPrompt(false);
+    setShowDropLead(false);
+    setShowSuccess(true);
+    setTimeout(() => window.location.reload(), 1500);
+  }
+
+  async function handleDropLead(data: DropLeadData) {
+    const res = await fetch(`/api/persons/${person.id}/drop-lead`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: "Drop lead failed" }));
+      throw new Error(body?.error ?? "Drop lead failed");
+    }
+    // On success, navigate away from person detail per §5.10.
+    router.push("/");
   }
 
   async function handleAdvanceStage() {
@@ -112,7 +290,9 @@ export function QuickLog({ person }: QuickLogProps) {
     }
   }
 
-  if (!expanded && !showPrompt && !showSuccess) {
+  const showCloseOut = openCommitments.length > 0;
+
+  if (!expanded && !showPrompt && !showSuccess && !showCloseOut) {
     return (
       <button
         onClick={() => setExpanded(true)}
@@ -130,6 +310,16 @@ export function QuickLog({ person }: QuickLogProps) {
         <span className="h-2 w-2 rounded-full bg-healthy-green shrink-0" />
         <p className="text-sm font-medium text-healthy-green">Activity logged</p>
       </div>
+    );
+  }
+
+  if (showCloseOut) {
+    return (
+      <CloseOutPrompt
+        openCommitments={openCommitments}
+        onResolve={handleCloseOutResolve}
+        onCancel={handleCloseOutCancel}
+      />
     );
   }
 
@@ -164,13 +354,32 @@ export function QuickLog({ person }: QuickLogProps) {
           >
             Advance to next stage?
           </button>
-          <button
-            onClick={handlePromptConfirm}
-            className="rounded-full bg-gold px-4 py-1.5 text-xs font-medium text-navy hover:bg-gold-hover"
-          >
-            Confirm
-          </button>
+          <div className="flex items-center gap-3">
+            {commitmentsV2Enabled && !showDropLead && (
+              <button
+                type="button"
+                data-testid="drop-lead-link"
+                onClick={() => setShowDropLead(true)}
+                className="text-xs text-muted-foreground hover:text-navy hover:underline"
+              >
+                Drop lead ▸
+              </button>
+            )}
+            <button
+              onClick={handlePromptConfirm}
+              className="rounded-full bg-gold px-4 py-1.5 text-xs font-medium text-navy hover:bg-gold-hover"
+            >
+              Confirm
+            </button>
+          </div>
         </div>
+        {commitmentsV2Enabled && showDropLead && (
+          <DropLeadPanel
+            personName={person.fullName}
+            onConfirm={handleDropLead}
+            onCancel={() => setShowDropLead(false)}
+          />
+        )}
       </div>
     );
   }
