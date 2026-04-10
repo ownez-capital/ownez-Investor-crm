@@ -35,7 +35,11 @@ export function NeedsAttention({ people }: { people: PersonWithComputed[] }) {
             </thead>
             <tbody>
               {sorted.map((person) => (
-                <tr key={person.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                <tr
+                  key={person.id}
+                  data-testid={`needs-attention-${person.id}`}
+                  className="border-b last:border-0 hover:bg-muted/50 transition-colors"
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 shrink-0 rounded-full bg-alert-red" />

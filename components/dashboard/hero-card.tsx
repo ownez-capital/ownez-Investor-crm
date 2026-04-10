@@ -13,7 +13,10 @@ interface HeroCardProps {
 
 export function HeroCard({ person, daysOverdue, isDueToday }: HeroCardProps) {
   return (
-    <div className="rounded-lg border-l-4 border-l-navy bg-card p-6 shadow-sm">
+    <div
+      data-testid={`action-queue-item-${person.id}`}
+      className="rounded-lg border-l-4 border-l-navy bg-card p-6 shadow-sm"
+    >
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold text-navy">

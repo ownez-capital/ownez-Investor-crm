@@ -27,19 +27,22 @@ function getActionQueue(people: PersonWithComputed[], today: string) {
     }
   }
 
-  // 1. Overdue: nextActionDate < today (most overdue first, then by dollar value)
+  // 1. Overdue: driven by computed p.isOverdue. In legacy mode this is
+  // equivalent to `nextActionDate < today`; in v2 mode (COMMITMENTS_V2=on)
+  // it reads from open commitment rows, so a fulfilled/superseded commitment
+  // correctly clears the overdue flag even though Person.nextActionDate may
+  // still point at the old past date. See lib/stale.ts computeIsOverdue.
   const overdue = people
     .filter(
       (p) =>
-        p.nextActionDate &&
-        p.nextActionDate < today &&
+        p.isOverdue &&
         p.pipelineStage !== "dead" &&
         p.pipelineStage !== "funded" &&
         p.pipelineStage !== "nurture"
     )
     .sort((a, b) => {
-      const aDays = daysBetween(a.nextActionDate!, today);
-      const bDays = daysBetween(b.nextActionDate!, today);
+      const aDays = a.nextActionDate ? daysBetween(a.nextActionDate, today) : 0;
+      const bDays = b.nextActionDate ? daysBetween(b.nextActionDate, today) : 0;
       if (bDays !== aDays) return bDays - aDays;
       return (b.initialInvestmentTarget ?? 0) - (a.initialInvestmentTarget ?? 0);
     });
@@ -111,14 +114,15 @@ export default async function DashboardPage() {
   const hero = queue[0] ?? null;
   const rest = queue.slice(1);
 
-  // Compute urgency info for each item
+  // Compute urgency info for each item. Uses the computed p.isOverdue flag
+  // so v2 mode honors commitment close-out state, not the mirrored
+  // Person.nextActionDate (which can lag behind fulfilled/superseded rows).
   function getUrgencyInfo(person: PersonWithComputed) {
-    const isOverdue =
-      person.nextActionDate != null && person.nextActionDate < today;
-    const daysOverdue = isOverdue
-      ? daysBetween(person.nextActionDate!, today)
-      : null;
-    const isDueToday = person.nextActionDate === today;
+    const daysOverdue =
+      person.isOverdue && person.nextActionDate
+        ? daysBetween(person.nextActionDate, today)
+        : null;
+    const isDueToday = person.nextActionDate === today && !person.isOverdue;
     return { daysOverdue, isDueToday };
   }
 

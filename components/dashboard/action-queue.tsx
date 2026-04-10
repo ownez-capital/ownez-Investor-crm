@@ -64,6 +64,7 @@ export function ActionQueue({ items }: ActionQueueProps) {
           {visible.map((item, index) => (
             <Link
               key={item.person.id}
+              data-testid={`action-queue-item-${item.person.id}`}
               href={`/person/${item.person.id}`}
               className="block px-3 md:px-4 py-3 hover:bg-muted/50 transition-colors"
             >
