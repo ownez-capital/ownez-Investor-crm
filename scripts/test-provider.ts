@@ -411,41 +411,68 @@ async function seedTestData() {
   console.log("  🌱 Seeding test data for non-mock provider...\n");
   const ds = await getDataService();
 
-  // Create a test org
-  await ds.createOrganization({ name: "Calloway Family Office", type: "family_office", notes: null });
+  // Idempotent seeding — check existence before creating each row so the
+  // test kit can be re-run against a Neon instance that was already seeded
+  // by a prior run (or by the main seed script). See docs/HANDOFF-commitments-
+  // lifecycle-integration.md §4.7 — prior to this fix, the second run would
+  // fail with a unique-constraint collision on `velocis_network` before any
+  // assertion could execute.
 
-  // Create test prospects with various stages
-  const prospect1 = await ds.createPerson({
-    fullName: "Robert Calloway",
-    roles: ["prospect"],
-    pipelineStage: "active_engagement",
-    leadSource: "velocis_network",
-    assignedRepId: "u-chad",
-    email: "rcalloway@callowayfo.com",
-    initialInvestmentTarget: 500000,
-  });
+  // Lead source — main seed script may have already created this.
+  const leadSources = await ds.getLeadSources({ includeInactive: true });
+  const hasVelocis = leadSources.some((ls) => ls.key === "velocis_network");
+  if (!hasVelocis) {
+    await ds.createLeadSource({ label: "Velocis Network" });
+  }
 
-  // Create activities for the prospect
-  await ds.createActivity(prospect1.id, {
-    activityType: "meeting",
-    source: "manual",
-    date: "2026-02-24",
-    time: "16:00",
-    outcome: "connected",
-    detail: "Test meeting for provider test kit",
-    documentsAttached: [],
-    loggedById: "u-chad",
-    annotation: null,
-    fulfillsCommitmentId: null,
-    commitmentType: null,
-    commitmentDetail: null,
-    commitmentDueDate: null,
-    commitmentStatus: null,
-    commitmentClosedDate: null,
-  });
+  // Organization — check by name.
+  const orgs = await ds.getOrganizations();
+  let orgExists = orgs.some((o) => o.name === "Calloway Family Office");
+  if (!orgExists) {
+    await ds.createOrganization({
+      name: "Calloway Family Office",
+      type: "family_office",
+      notes: null,
+    });
+    orgExists = true;
+  }
 
-  // Create a lead source
-  await ds.createLeadSource({ label: "Velocis Network" });
+  // Prospect — check by full name + email.
+  const existing = await ds.getPeople({ roles: ["prospect"] });
+  const existingRobert = existing.find(
+    (p) => p.fullName === "Robert Calloway" && p.email === "rcalloway@callowayfo.com"
+  );
+  if (!existingRobert) {
+    const created = await ds.createPerson({
+      fullName: "Robert Calloway",
+      roles: ["prospect"],
+      pipelineStage: "active_engagement",
+      leadSource: "velocis_network",
+      assignedRepId: "u-chad",
+      email: "rcalloway@callowayfo.com",
+      initialInvestmentTarget: 500000,
+    });
+
+    // Only seed the test activity on fresh create — otherwise we'd accumulate
+    // duplicate "Test meeting for provider test kit" rows on every run.
+    await ds.createActivity(created.id, {
+      activityType: "meeting",
+      source: "manual",
+      date: "2026-02-24",
+      time: "16:00",
+      outcome: "connected",
+      detail: "Test meeting for provider test kit",
+      documentsAttached: [],
+      loggedById: "u-chad",
+      annotation: null,
+      fulfillsCommitmentId: null,
+      commitmentType: null,
+      commitmentDetail: null,
+      commitmentDueDate: null,
+      commitmentStatus: null,
+      commitmentClosedDate: null,
+    });
+  }
 }
 
 // ─── Main ───

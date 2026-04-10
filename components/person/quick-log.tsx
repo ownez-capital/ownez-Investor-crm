@@ -207,17 +207,19 @@ export function QuickLog({ person, commitmentsV2Enabled = false }: QuickLogProps
 
     if (!anyFulfilledOrReplace) {
       // All "pending": skip Next Action prompt entirely and fire NO POSTs.
-      // Per §6.4.2 step 1, this path goes to "success". We use router.refresh()
-      // instead of window.location.reload so the Quick Log input returns to
-      // its expanded, empty, enabled state — required by canary test 2B,
-      // which uses "input visible and empty" as a proxy for "Next Action
-      // prompt was skipped". A full reload would collapse Quick Log behind
-      // the "+ Log Activity" button and the proxy would fail.
-      setExpanded(true);
-      setShowSuccess(false);
+      // Per DESIGN-SPEC §6.4.2 step 3, show the "Activity logged" banner for
+      // 1.5 seconds, then restore the Quick Log to its expanded, empty,
+      // enabled state via router.refresh (not window.location.reload — a
+      // full reload would collapse the UI and break canary 2B's poll for
+      // the input returning empty within 5 seconds).
+      setShowSuccess(true);
       setShowPrompt(false);
       setPendingActivityId(null);
-      router.refresh();
+      setTimeout(() => {
+        setShowSuccess(false);
+        setExpanded(true);
+        router.refresh();
+      }, 1500);
       return;
     }
 
