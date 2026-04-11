@@ -619,24 +619,24 @@ Colored dot communicates type — no badges on entries.
 ─── Reassigned: Chad → New Rep · Mar 15, 2026 ───
 ```
 
-**Commitment Set entries** (see §5.9) render as small inline markers with a ◉ glyph. They always show the commitment type, detail, and due date, and — once terminal — the status badge:
+**Next action set entries** (see §5.9) render as small inline markers with a ◉ glyph. They always show the next-action type, detail, and due date, and — once terminal — the status badge. **Important:** the DB column and internal code name is `commitment_set`, but the user-facing label uses plain-language "Next action set" / "done" / "replaced" — Chad is setting a next action, not making a "commitment". Treat "Commitment" as an internal-codebase term only; never surface it to the user.
 ```
-◉ Commitment set · Follow up · Q3 deck · due Mar 5
-◉ Commitment set · Follow up · Q3 deck · due Mar 5 · ✓ fulfilled (2d late)
-◉ Commitment set · Follow up · Q3 deck · due Mar 5 · ↺ superseded
-◉ Commitment set · Follow up · Q3 deck · due Mar 5 · ✕ cancelled
+◉ Next action set · Follow Up · Q3 deck · due Mar 5
+◉ Next action set · Follow Up · Q3 deck · due Mar 5 · ✓ done (2d late)
+◉ Next action set · Follow Up · Q3 deck · due Mar 5 · ↺ replaced
+◉ Next action set · Follow Up · Q3 deck · due Mar 5 · ✕ cancelled
 ```
 
-**Fulfillment links on activities** — when an activity was used to fulfill a commitment, its entry shows a small green fulfillment line directly underneath:
+**Fulfillment links on activities** — when an activity was used to close out a prior next action, its entry shows a small green done line directly underneath:
 ```
 📧 Email · Mar 7
    "Sent Q3 deck with annotations."
-   ✓ Fulfilled: Follow up — Q3 deck (2d late)
+   ✓ Done: Follow Up — Q3 deck (2d late)
 ```
 
-**Still-open commitments** that have become overdue render with an additional urgency line below the Commitment Set entry when viewed in the timeline on the date they go past due:
+**Still-open next actions** that have become overdue render with an additional urgency line below the marker when viewed in the timeline on the date they go past due:
 ```
-◉ Commitment set · Follow up · Q3 deck · due Mar 5
+◉ Next action set · Follow Up · Q3 deck · due Mar 5
    ⚠ Still open as of today (Nd overdue)
 ```
 

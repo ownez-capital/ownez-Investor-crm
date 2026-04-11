@@ -149,12 +149,18 @@ export function ActivityTimeline({ activities, users }: ActivityTimelineProps) {
 }
 
 /**
- * Inline marker for a Commitment Set activity row. Per DESIGN-SPEC §6.4.5:
+ * Inline marker for a Commitment Set activity row. The DB column and internal
+ * model name is "commitment_set" but the user-facing label uses plain language
+ * ("Next action set" / "done" / "replaced") per the Chad-facing terminology
+ * rule in docs/user-quick-log-guide.md — Chad is setting a next action, not
+ * making a "commitment". DESIGN-SPEC.md §6.4.5 shows earlier draft copy
+ * ("Commitment set") which was jargon that leaked from the internal model.
  *
- *   ◉ Commitment set · Follow up · Q3 deck · due Mar 5
- *   ◉ Commitment set · Follow up · Q3 deck · due Mar 5 · ✓ fulfilled (2d late)
- *   ◉ Commitment set · Follow up · Q3 deck · due Mar 5 · ↺ superseded
- *   ◉ Commitment set · Follow up · Q3 deck · due Mar 5 · ✕ cancelled
+ * Renders as:
+ *   ◉ Next action set · Follow Up · Q3 deck · due Mar 5
+ *   ◉ Next action set · Follow Up · Q3 deck · due Mar 5 · ✓ done (2d late)
+ *   ◉ Next action set · Follow Up · Q3 deck · due Mar 5 · ↺ replaced
+ *   ◉ Next action set · Follow Up · Q3 deck · due Mar 5 · ✕ cancelled
  */
 function CommitmentMarker({ activity }: { activity: Activity }) {
   const label = commitmentTypeLabel(activity.commitmentType);
@@ -169,11 +175,11 @@ function CommitmentMarker({ activity }: { activity: Activity }) {
         : 0;
     const lateSuffix = lateDays > 0 ? ` (${lateDays}d late)` : "";
     statusBadge = {
-      text: `✓ fulfilled${lateSuffix}`,
+      text: `✓ done${lateSuffix}`,
       className: "text-healthy-green",
     };
   } else if (activity.commitmentStatus === "superseded") {
-    statusBadge = { text: "↺ superseded", className: "text-muted-foreground" };
+    statusBadge = { text: "↺ replaced", className: "text-muted-foreground" };
   } else if (activity.commitmentStatus === "cancelled") {
     statusBadge = { text: "✕ cancelled", className: "text-muted-foreground" };
   }
@@ -183,12 +189,12 @@ function CommitmentMarker({ activity }: { activity: Activity }) {
       data-testid={`timeline-commitment-marker-${activity.id}`}
       className="relative flex items-center py-2 pl-[28px]"
     >
-      {/* Commitment marker dot on the line (gold so it reads as an intent) */}
+      {/* Next-action marker dot on the line (gold so it reads as an intent) */}
       <div className="absolute left-[8px] flex h-[14px] w-[14px] items-center justify-center rounded-full bg-gold/15 ring-2 ring-background">
         <Target size={9} className="text-gold" aria-hidden />
       </div>
       <span className="text-[10px] md:text-xs text-muted-foreground italic">
-        Commitment set · <span className="font-medium text-navy not-italic">{label}</span>
+        Next action set · <span className="font-medium text-navy not-italic">{label}</span>
         {detail ? <span className="not-italic"> · {detail}</span> : null}
         {due ? <span> · due {due}</span> : null}
         {statusBadge ? (
@@ -246,14 +252,14 @@ function TimelineEntry({
           {activity.detail}
         </p>
 
-        {/* Fulfillment link: shown when this activity closed out a commitment.
-            Links visually to the Commitment Set row rendered above. */}
+        {/* Fulfillment link: shown when this activity closed out a next-action
+            commitment row. Links visually to the ◉ marker rendered above. */}
         {fulfillsCommitment ? (
           <p
             data-testid={`timeline-fulfillment-link-${activity.id}`}
             className="mt-1 text-xs font-medium text-healthy-green"
           >
-            ✓ Fulfilled: {commitmentTypeLabel(fulfillsCommitment.commitmentType)}
+            ✓ Done: {commitmentTypeLabel(fulfillsCommitment.commitmentType)}
             {fulfillsCommitment.commitmentDetail
               ? ` — ${fulfillsCommitment.commitmentDetail}`
               : ""}

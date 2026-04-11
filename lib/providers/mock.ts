@@ -390,6 +390,15 @@ let relatedContactLinks: RelatedContactLink[] = [
 ];
 
 // ─── Initial state snapshots (for test reset) ───
+// Captured BEFORE backfillCommitmentsFromLegacyFields runs below, so that
+// resetMockData() produces a pristine pre-backfill state. E2E tests call
+// POST /api/test-reset in beforeEach and then seed their own commitments via
+// seedPersonWithOpenCommitment; if the snapshot included backfilled rows,
+// those tests would end up in multi-commitment mode (tested person has TWO
+// open commitments), breaking the `close-out-fulfilled` singular-testid
+// contract. User manual browsing is unaffected because the user doesn't
+// trigger test-reset — their initial page view sees the backfilled state
+// populated by the backfill call below.
 const INITIAL_ORGANIZATIONS = JSON.stringify(organizations);
 const INITIAL_PEOPLE = JSON.stringify(people);
 const INITIAL_FUNDING_ENTITIES = JSON.stringify(fundingEntities);
@@ -398,6 +407,12 @@ const INITIAL_ACTIVITIES = JSON.stringify(activities);
 const INITIAL_REFERRER_LINKS = JSON.stringify(referrerLinks);
 const INITIAL_RELATED_CONTACT_LINKS = JSON.stringify(relatedContactLinks);
 const INITIAL_USERS = JSON.stringify(users);
+
+// Run the one-shot backfill AFTER the snapshots are captured so the user's
+// dashboard starts with synthesized commitment_set rows (otherwise every
+// seeded prospect looks not-overdue in v2 mode). See
+// backfillCommitmentsFromLegacyFields below for the full rationale.
+backfillCommitmentsFromLegacyFields();
 
 function resetMockData() {
   organizations = JSON.parse(INITIAL_ORGANIZATIONS);
@@ -412,6 +427,66 @@ function resetMockData() {
   systemConfig = JSON.parse(INITIAL_SYSTEM_CONFIG);
   pipelineStageConfigs = JSON.parse(INITIAL_PIPELINE_STAGE_CONFIGS);
   activityTypeConfigs = JSON.parse(INITIAL_ACTIVITY_TYPE_CONFIGS);
+}
+
+/**
+ * One-shot backfill that synthesizes open commitment_set activity rows from
+ * each prospect's legacy Person.nextAction* fields.
+ *
+ * The mock seed predates the Commitments Lifecycle (v2) feature and stores
+ * next actions only on Person.nextActionDate / nextActionType / nextActionDetail.
+ * In v2 mode, overdue/stale are driven by open commitment_set rows in the
+ * activities table — if no such rows exist, every seeded prospect looks
+ * not-overdue regardless of how past-due their legacy nextActionDate is.
+ *
+ * This function is the mock-provider equivalent of scripts/backfill-
+ * commitments.ts, which runs against Neon before the production flag flip.
+ * Keeping them behaviorally equivalent means the manual walkthrough against
+ * `DATA_PROVIDER=mock COMMITMENTS_V2=on` produces the same UI state that
+ * post-backfill production will show.
+ *
+ * Idempotent by construction — called fresh on each resetMockData() and skips
+ * any person who already has an open commitment_set row (so an already-backfilled
+ * array isn't double-populated).
+ *
+ * NOT gated behind isCommitmentsV2Enabled() — the backfilled rows are invisible
+ * to legacy code paths (stale.ts passes `openCommitments=null` when the flag is
+ * off, ignoring them entirely), so they're safe to have in memory regardless.
+ */
+function backfillCommitmentsFromLegacyFields() {
+  const SKIP_STAGES = new Set(["dead", "nurture", "funded"]);
+  for (const person of people) {
+    if (!person.nextActionDate) continue;
+    if (!person.pipelineStage || SKIP_STAGES.has(person.pipelineStage)) continue;
+
+    const alreadyHasOpen = activities.some(
+      (a) =>
+        a.personId === person.id &&
+        a.activityType === "commitment_set" &&
+        a.commitmentStatus === "open"
+    );
+    if (alreadyHasOpen) continue;
+
+    activities.push({
+      id: `c-backfill-${person.id}`,
+      personId: person.id,
+      activityType: "commitment_set",
+      source: "manual",
+      date: person.nextActionDate,
+      time: "00:00",
+      outcome: "connected",
+      detail: "Backfilled from legacy Next Action",
+      documentsAttached: [],
+      loggedById: "u-chad",
+      annotation: null,
+      fulfillsCommitmentId: null,
+      commitmentType: person.nextActionType ?? "follow_up",
+      commitmentDetail: person.nextActionDetail ?? "",
+      commitmentDueDate: person.nextActionDate,
+      commitmentStatus: "open",
+      commitmentClosedDate: null,
+    });
+  }
 }
 
 // ─── Helper: enrich person with computed fields ───

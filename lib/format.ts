@@ -19,11 +19,23 @@ export function formatCurrency(value: number | null | undefined): string {
 }
 
 export function getTodayCT(): string {
-  const now = new Date();
-  const ct = new Date(
-    now.toLocaleString("en-US", { timeZone: TIMEZONE })
-  );
-  return ct.toISOString().split("T")[0];
+  // Use Intl.DateTimeFormat with en-CA locale, which formats dates in ISO
+  // yyyy-mm-dd directly — and respects the `timeZone` option regardless of
+  // the Node process's local timezone.
+  //
+  // Previous implementation called `new Date(now.toLocaleString(...))` which
+  // double-shifted the date: toLocaleString produced a CT-formatted string,
+  // new Date parsed it as local-timezone, then toISOString converted back to
+  // UTC. On machines where local TZ != CT (or near midnight-UTC boundaries),
+  // this returned the WRONG date, breaking the Quick Log close-out prompt's
+  // "dueDate <= today" filter (commitments due today were filtered out
+  // because the server thought today was yesterday).
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 export function formatDate(isoDate: string | null | undefined): string {
