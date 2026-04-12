@@ -16,7 +16,7 @@ When the flag is stable and we're ready to remove it:
 1. **Delete the entire old code path** at every call site below. Do not leave it behind commented out, behind a `// legacy` marker, or behind a different flag.
 2. **Delete `lib/feature-flags.ts`** if it has no other flags in it.
 3. **Delete this file** (`docs/feature-flag-removal-checklist.md`) in the same commit.
-4. **Delete `activity-flow-proposal.html`** at the repo root — it was a throwaway design artifact kept around for reference while the flag was live.
+4. ~~Delete `activity-flow-proposal.html`~~ — already deleted; the before/after flow diagrams were migrated into `docs/zoho-commitments-integration.md` §1 before the production rollout.
 5. **Update `DESIGN-SPEC.md`** to remove any remaining references to the flag (currently none — the spec was written assuming the feature ships).
 6. **Remove `COMMITMENTS_V2` from all environment files**: `.env.local`, `.env.example`, Vercel production/preview/development env settings.
 

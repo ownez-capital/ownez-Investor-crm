@@ -509,8 +509,9 @@ Once the feature has been live and stable for ~2 weeks:
 1. Open [docs/feature-flag-removal-checklist.md](feature-flag-removal-checklist.md)
 2. Walk the inventory — every `isCommitmentsV2Enabled()` call site gets removed, the flag's two branches collapse to the new behavior
 3. The Neon snapshot branch from 0.5 can be deleted
-4. Delete the throwaway `activity-flow-proposal.html` artifact at the repo root
-5. Final commit: `chore(commitments-v2): remove feature flag`
+4. Final commit: `chore(commitments-v2): remove feature flag`
+
+Note: `activity-flow-proposal.html` was previously listed as a cleanup item but was deleted pre-rollout once its before/after flow diagrams were migrated into `docs/zoho-commitments-integration.md` §1. No cleanup needed.
 
 This turns the feature from "gated" to "permanent" and removes the old code path from the codebase.
 

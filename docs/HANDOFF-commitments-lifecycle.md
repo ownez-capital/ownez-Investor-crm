@@ -45,7 +45,7 @@ Test scenarios 2B and 4A in [docs/commitments-manual-test-plan.md](commitments-m
 - [docs/zoho-commitments-integration.md](zoho-commitments-integration.md) — integration team handoff with embedded before/after Mermaid diagrams
 - [docs/commitments-manual-test-plan.md](commitments-manual-test-plan.md) — ~30 manual scenarios, canary scenarios 2B and 4A are business-critical
 - [docs/feature-flag-removal-checklist.md](feature-flag-removal-checklist.md) — inventory for eventual surgical removal
-- [activity-flow-proposal.html](../activity-flow-proposal.html) — throwaway Mermaid artifact at repo root, delete only as part of feature flag removal
+- ~~activity-flow-proposal.html~~ — the before/after Mermaid diagrams were migrated into `docs/zoho-commitments-integration.md` §1 and the standalone HTML was deleted pre-rollout (see commit history)
 
 **Type plumbing (all type-safe, typecheck green, 33/33 unit tests passing):**
 - `lib/types.ts`:
