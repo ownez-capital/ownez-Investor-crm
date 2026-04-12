@@ -10,6 +10,7 @@ import type {
 import { ACTIVE_PIPELINE_STAGES, COMMITTED_STAGES, TOUCH_ACTIVITY_TYPES, LEAD_SOURCES, PIPELINE_STAGES } from "../constants";
 import { computeDaysSinceLastTouch, computeIsStale, computeIsOverdue } from "../stale";
 import { getTodayCT } from "../format";
+import { isCommitmentsV2Enabled } from "../feature-flags";
 import { hashSync } from "bcryptjs";
 
 // ─── Password hashes ───
@@ -319,60 +320,60 @@ let fundedInvestments: FundedInvestment[] = [
 // ─── Activities (30+ entries from reference TIMELINE) ───
 let activities: Activity[] = [
   // Robert Calloway activities
-  { id: "a-1", personId: "p-robert", activityType: "meeting", source: "manual", date: "2026-02-24", time: "16:00", outcome: "connected", detail: "Coffee at Ascension. Reviewed performance data together. He pulled out a notepad and wrote down yield numbers — good sign. Wants vintage-level returns before committing. Wife is involved, may need a couple meeting. Asked about liquidity terms.", documentsAttached: ["Q3 Performance Summary.pdf", "Fund V Overview - 1 Pager.pdf"], loggedById: "u-chad", annotation: null },
-  { id: "a-2", personId: "p-robert", activityType: "email", source: "manual", date: "2026-02-19", time: "11:00", outcome: "connected", detail: "Sent Q2 performance summary as requested after our Jan meeting.", documentsAttached: ["Q2 Performance Summary.pdf"], loggedById: "u-chad", annotation: null },
-  { id: "a-3", personId: "p-robert", activityType: "stage_change", source: "manual", date: "2026-02-05", time: "10:00", outcome: "connected", detail: "Stage updated from Pitch to Active Engagement — requested vintage data.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-4", personId: "p-robert", activityType: "meeting", source: "manual", date: "2026-01-28", time: "10:00", outcome: "connected", detail: "Full deck presentation over breakfast at The Mansion. He's serious — asked about fund structure, fee breakdown, and who else is in. Wants vintage returns.", documentsAttached: ["OwnEZ Investor Deck v3.pdf"], loggedById: "u-chad", annotation: null },
-  { id: "a-5", personId: "p-robert", activityType: "meeting", source: "manual", date: "2026-01-20", time: "10:00", outcome: "connected", detail: "Coffee at Ascension for discovery. Discussed investment goals and timeline.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-6", personId: "p-robert", activityType: "email", source: "manual", date: "2026-01-12", time: "09:00", outcome: "connected", detail: "Sent intro email after Velocis event.", documentsAttached: ["OwnEZ Fund V - 1 Pager.pdf"], loggedById: "u-chad", annotation: null },
+  { id: "a-1", personId: "p-robert", activityType: "meeting", source: "manual", date: "2026-02-24", time: "16:00", outcome: "connected", detail: "Coffee at Ascension. Reviewed performance data together. He pulled out a notepad and wrote down yield numbers — good sign. Wants vintage-level returns before committing. Wife is involved, may need a couple meeting. Asked about liquidity terms.", documentsAttached: ["Q3 Performance Summary.pdf", "Fund V Overview - 1 Pager.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-2", personId: "p-robert", activityType: "email", source: "manual", date: "2026-02-19", time: "11:00", outcome: "connected", detail: "Sent Q2 performance summary as requested after our Jan meeting.", documentsAttached: ["Q2 Performance Summary.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-3", personId: "p-robert", activityType: "stage_change", source: "manual", date: "2026-02-05", time: "10:00", outcome: "connected", detail: "Stage updated from Pitch to Active Engagement — requested vintage data.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-4", personId: "p-robert", activityType: "meeting", source: "manual", date: "2026-01-28", time: "10:00", outcome: "connected", detail: "Full deck presentation over breakfast at The Mansion. He's serious — asked about fund structure, fee breakdown, and who else is in. Wants vintage returns.", documentsAttached: ["OwnEZ Investor Deck v3.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-5", personId: "p-robert", activityType: "meeting", source: "manual", date: "2026-01-20", time: "10:00", outcome: "connected", detail: "Coffee at Ascension for discovery. Discussed investment goals and timeline.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-6", personId: "p-robert", activityType: "email", source: "manual", date: "2026-01-12", time: "09:00", outcome: "connected", detail: "Sent intro email after Velocis event.", documentsAttached: ["OwnEZ Fund V - 1 Pager.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
 
   // Sandra Kim activities
-  { id: "a-7", personId: "p-sandra", activityType: "email", source: "manual", date: "2026-02-25", time: "09:15", outcome: "connected", detail: "Sent entity structure options — LLC vs Trust comparison memo.", documentsAttached: ["Entity Structure Options.pdf"], loggedById: "u-chad", annotation: null },
-  { id: "a-8", personId: "p-sandra", activityType: "stage_change", source: "manual", date: "2026-02-18", time: "10:00", outcome: "connected", detail: "Stage updated from Active Engagement to Soft Commit — $250K verbal commitment at lunch.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-9", personId: "p-sandra", activityType: "meeting", source: "manual", date: "2026-02-20", time: "14:00", outcome: "connected", detail: "Lunch at Knife. She's ready to commit $250K. Checking with attorney on which entity to use — personal vs LLC. CPA (Mike Lawson) is supportive.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-10", personId: "p-sandra", activityType: "email", source: "manual", date: "2026-01-14", time: "10:00", outcome: "connected", detail: "Sent pitch deck and case study.", documentsAttached: ["OwnEZ Investor Deck v3.pdf", "Case Study.pdf"], loggedById: "u-chad", annotation: null },
-  { id: "a-11", personId: "p-sandra", activityType: "meeting", source: "manual", date: "2026-01-06", time: "12:00", outcome: "connected", detail: "Lunch meeting for discovery.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-12", personId: "p-sandra", activityType: "call", source: "manual", date: "2025-12-18", time: "14:00", outcome: "connected", detail: "Intro call from CPA referral.", documentsAttached: [], loggedById: "u-chad", annotation: null },
+  { id: "a-7", personId: "p-sandra", activityType: "email", source: "manual", date: "2026-02-25", time: "09:15", outcome: "connected", detail: "Sent entity structure options — LLC vs Trust comparison memo.", documentsAttached: ["Entity Structure Options.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-8", personId: "p-sandra", activityType: "stage_change", source: "manual", date: "2026-02-18", time: "10:00", outcome: "connected", detail: "Stage updated from Active Engagement to Soft Commit — $250K verbal commitment at lunch.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-9", personId: "p-sandra", activityType: "meeting", source: "manual", date: "2026-02-20", time: "14:00", outcome: "connected", detail: "Lunch at Knife. She's ready to commit $250K. Checking with attorney on which entity to use — personal vs LLC. CPA (Mike Lawson) is supportive.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-10", personId: "p-sandra", activityType: "email", source: "manual", date: "2026-01-14", time: "10:00", outcome: "connected", detail: "Sent pitch deck and case study.", documentsAttached: ["OwnEZ Investor Deck v3.pdf", "Case Study.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-11", personId: "p-sandra", activityType: "meeting", source: "manual", date: "2026-01-06", time: "12:00", outcome: "connected", detail: "Lunch meeting for discovery.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-12", personId: "p-sandra", activityType: "call", source: "manual", date: "2025-12-18", time: "14:00", outcome: "connected", detail: "Intro call from CPA referral.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
 
   // David Thornton activities
-  { id: "a-13", personId: "p-david", activityType: "call", source: "manual", date: "2026-02-21", time: "09:00", outcome: "connected", detail: "Intro call — 30 min. Just exited $12M manufacturing sale. Advisor told him to park cash in real estate credit. Very engaged, asked about default rates, underwriting standards, team background. Scheduled discovery for Feb 25 at 2pm.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-14", personId: "p-david", activityType: "stage_change", source: "manual", date: "2026-02-20", time: "14:00", outcome: "connected", detail: "Stage updated from Initial Contact to Discovery — scheduled for Feb 25.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-15", personId: "p-david", activityType: "email", source: "manual", date: "2026-02-14", time: "10:00", outcome: "connected", detail: "Sent intro email with one-pager from M&A attorney referral.", documentsAttached: ["OwnEZ Fund V - 1 Pager.pdf"], loggedById: "u-chad", annotation: null },
+  { id: "a-13", personId: "p-david", activityType: "call", source: "manual", date: "2026-02-21", time: "09:00", outcome: "connected", detail: "Intro call — 30 min. Just exited $12M manufacturing sale. Advisor told him to park cash in real estate credit. Very engaged, asked about default rates, underwriting standards, team background. Scheduled discovery for Feb 25 at 2pm.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-14", personId: "p-david", activityType: "stage_change", source: "manual", date: "2026-02-20", time: "14:00", outcome: "connected", detail: "Stage updated from Initial Contact to Discovery — scheduled for Feb 25.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-15", personId: "p-david", activityType: "email", source: "manual", date: "2026-02-14", time: "10:00", outcome: "connected", detail: "Sent intro email with one-pager from M&A attorney referral.", documentsAttached: ["OwnEZ Fund V - 1 Pager.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
 
   // Patricia Wells activities
-  { id: "a-16", personId: "p-patricia", activityType: "email", source: "manual", date: "2026-02-22", time: "15:30", outcome: "attempted", detail: "Sent pitch deck follow-up. Referenced our conversation about peer validation — offered to connect her with an existing investor. No response yet.", documentsAttached: ["OwnEZ Investor Deck v3.pdf"], loggedById: "u-chad", annotation: null },
-  { id: "a-17", personId: "p-patricia", activityType: "stage_change", source: "manual", date: "2026-02-14", time: "15:00", outcome: "connected", detail: "Stage updated from Discovery to Pitch Delivered.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-18", personId: "p-patricia", activityType: "meeting", source: "manual", date: "2026-02-14", time: "14:00", outcome: "connected", detail: "In-person pitch at her Highland Park office. She was receptive but cautious. Third-gen wealth, very conservative allocation. Biggest concern: she wants to talk to someone who's already invested before she commits. Asked about minimum investment.", documentsAttached: ["OwnEZ Investor Deck v3.pdf", "Fund V Overview.pdf"], loggedById: "u-chad", annotation: null },
-  { id: "a-19", personId: "p-patricia", activityType: "meeting", source: "manual", date: "2026-02-03", time: "10:00", outcome: "connected", detail: "Office visit for discovery.", documentsAttached: [], loggedById: "u-chad", annotation: null },
+  { id: "a-16", personId: "p-patricia", activityType: "email", source: "manual", date: "2026-02-22", time: "15:30", outcome: "attempted", detail: "Sent pitch deck follow-up. Referenced our conversation about peer validation — offered to connect her with an existing investor. No response yet.", documentsAttached: ["OwnEZ Investor Deck v3.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-17", personId: "p-patricia", activityType: "stage_change", source: "manual", date: "2026-02-14", time: "15:00", outcome: "connected", detail: "Stage updated from Discovery to Pitch Delivered.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-18", personId: "p-patricia", activityType: "meeting", source: "manual", date: "2026-02-14", time: "14:00", outcome: "connected", detail: "In-person pitch at her Highland Park office. She was receptive but cautious. Third-gen wealth, very conservative allocation. Biggest concern: she wants to talk to someone who's already invested before she commits. Asked about minimum investment.", documentsAttached: ["OwnEZ Investor Deck v3.pdf", "Fund V Overview.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-19", personId: "p-patricia", activityType: "meeting", source: "manual", date: "2026-02-03", time: "10:00", outcome: "connected", detail: "Office visit for discovery.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
 
   // Marcus Johnson activities
-  { id: "a-20", personId: "p-marcus", activityType: "meeting", source: "manual", date: "2026-02-23", time: "14:00", outcome: "connected", detail: "Zoom call — 45 min. Walked through his rental portfolio yield (~6%) vs OwnEZ target (~9-11%). He's genuinely interested but wants to see one more quarter play out before committing. Not a stall — he's methodical. Suggested inviting him to March investor dinner.", documentsAttached: ["Rental vs Credit Fund Comparison.pdf", "Marcus Johnson - Portfolio Analysis.xlsx"], loggedById: "u-chad", annotation: null },
-  { id: "a-21", personId: "p-marcus", activityType: "meeting", source: "manual", date: "2026-01-30", time: "14:00", outcome: "connected", detail: "Full presentation via Zoom. Walked through deck, Q&A was focused on how this compares to his direct RE holdings. He's doing the math himself — comparing 6% rental yield to 9-11% OwnEZ target.", documentsAttached: ["OwnEZ Investor Deck v3.pdf"], loggedById: "u-chad", annotation: null },
-  { id: "a-22", personId: "p-marcus", activityType: "meeting", source: "manual", date: "2026-01-18", time: "10:00", outcome: "connected", detail: "Zoom discovery meeting.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-23", personId: "p-marcus", activityType: "call", source: "manual", date: "2026-01-08", time: "11:00", outcome: "connected", detail: "LinkedIn DM followed by intro call.", documentsAttached: [], loggedById: "u-chad", annotation: null },
+  { id: "a-20", personId: "p-marcus", activityType: "meeting", source: "manual", date: "2026-02-23", time: "14:00", outcome: "connected", detail: "Zoom call — 45 min. Walked through his rental portfolio yield (~6%) vs OwnEZ target (~9-11%). He's genuinely interested but wants to see one more quarter play out before committing. Not a stall — he's methodical. Suggested inviting him to March investor dinner.", documentsAttached: ["Rental vs Credit Fund Comparison.pdf", "Marcus Johnson - Portfolio Analysis.xlsx"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-21", personId: "p-marcus", activityType: "meeting", source: "manual", date: "2026-01-30", time: "14:00", outcome: "connected", detail: "Full presentation via Zoom. Walked through deck, Q&A was focused on how this compares to his direct RE holdings. He's doing the math himself — comparing 6% rental yield to 9-11% OwnEZ target.", documentsAttached: ["OwnEZ Investor Deck v3.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-22", personId: "p-marcus", activityType: "meeting", source: "manual", date: "2026-01-18", time: "10:00", outcome: "connected", detail: "Zoom discovery meeting.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-23", personId: "p-marcus", activityType: "call", source: "manual", date: "2026-01-08", time: "11:00", outcome: "connected", detail: "LinkedIn DM followed by intro call.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
 
   // James Whitfield activities
-  { id: "a-24", personId: "p-whitfield", activityType: "call", source: "manual", date: "2026-02-25", time: "08:30", outcome: "connected", detail: "Called attorney's office. LLC docs in progress, needs 5 more business days. No concerns, just process.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-25", personId: "p-whitfield", activityType: "stage_change", source: "manual", date: "2026-02-18", time: "16:30", outcome: "connected", detail: "Stage updated from Active Engagement to Soft Commit — $500K confirmed.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-26", personId: "p-whitfield", activityType: "call", source: "manual", date: "2026-02-18", time: "16:00", outcome: "connected", detail: "Confirmed soft commit — $500K. Wants to invest through new LLC rather than existing entity. Attorney will handle setup. Very straightforward conversation.", documentsAttached: [], loggedById: "u-chad", annotation: null },
+  { id: "a-24", personId: "p-whitfield", activityType: "call", source: "manual", date: "2026-02-25", time: "08:30", outcome: "connected", detail: "Called attorney's office. LLC docs in progress, needs 5 more business days. No concerns, just process.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-25", personId: "p-whitfield", activityType: "stage_change", source: "manual", date: "2026-02-18", time: "16:30", outcome: "connected", detail: "Stage updated from Active Engagement to Soft Commit — $500K confirmed.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-26", personId: "p-whitfield", activityType: "call", source: "manual", date: "2026-02-18", time: "16:00", outcome: "connected", detail: "Confirmed soft commit — $500K. Wants to invest through new LLC rather than existing entity. Attorney will handle setup. Very straightforward conversation.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
 
   // Angela Torres activities
-  { id: "a-27", personId: "p-torres", activityType: "email", source: "manual", date: "2026-02-24", time: "11:00", outcome: "connected", detail: "Reminded to upload passport scan for KYC in Agora portal. She said she'd do it tonight.", documentsAttached: [], loggedById: "u-chad", annotation: null },
+  { id: "a-27", personId: "p-torres", activityType: "email", source: "manual", date: "2026-02-24", time: "11:00", outcome: "connected", detail: "Reminded to upload passport scan for KYC in Agora portal. She said she'd do it tonight.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
 
   // William Grant activities
-  { id: "a-28", personId: "p-grant", activityType: "call", source: "manual", date: "2026-02-17", time: "10:00", outcome: "attempted", detail: "Left voicemail referencing Tolleson advisor's warm intro. Sent follow-up email with one-pager.", documentsAttached: ["OwnEZ Fund V - 1 Pager.pdf"], loggedById: "u-chad", annotation: null },
+  { id: "a-28", personId: "p-grant", activityType: "call", source: "manual", date: "2026-02-17", time: "10:00", outcome: "attempted", detail: "Left voicemail referencing Tolleson advisor's warm intro. Sent follow-up email with one-pager.", documentsAttached: ["OwnEZ Fund V - 1 Pager.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
 
   // Rachel Adams activities
-  { id: "a-29", personId: "p-rachel", activityType: "email", source: "manual", date: "2026-02-23", time: "10:00", outcome: "connected", detail: "Sent case study of anonymous investor with similar profile who started at $100K and scaled to $500K over 18 months.", documentsAttached: ["Investor Case Study - Anonymous.pdf"], loggedById: "u-chad", annotation: null },
-  { id: "a-30", personId: "p-rachel", activityType: "stage_change", source: "manual", date: "2026-02-12", time: "11:00", outcome: "connected", detail: "Stage updated from Pitch to Active Engagement. Post-pitch interest confirmed — wants case study.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-31", personId: "p-rachel", activityType: "meeting", source: "manual", date: "2026-02-06", time: "15:00", outcome: "connected", detail: "Pitched OwnEZ via Zoom — 40 min. She asked detailed questions about ITIN lending model, default rates, and borrower demographics. Very analytical. Wants a case study of a similar investor before committing. Ken's warm intro clearly helped.", documentsAttached: ["OwnEZ Investor Deck v3.pdf"], loggedById: "u-chad", annotation: null },
-  { id: "a-32", personId: "p-rachel", activityType: "meeting", source: "manual", date: "2026-01-28", time: "11:00", outcome: "connected", detail: "Zoom discovery — 25 min. Ken's warm intro set good context. She manages family trust, looking for yield alternatives to fixed income. Currently 60/40 traditional allocation.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-33", personId: "p-rachel", activityType: "email", source: "manual", date: "2026-01-18", time: "09:00", outcome: "connected", detail: "Ken sent intro email connecting Rachel with Chad.", documentsAttached: [], loggedById: "u-ken", annotation: null },
+  { id: "a-29", personId: "p-rachel", activityType: "email", source: "manual", date: "2026-02-23", time: "10:00", outcome: "connected", detail: "Sent case study of anonymous investor with similar profile who started at $100K and scaled to $500K over 18 months.", documentsAttached: ["Investor Case Study - Anonymous.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-30", personId: "p-rachel", activityType: "stage_change", source: "manual", date: "2026-02-12", time: "11:00", outcome: "connected", detail: "Stage updated from Pitch to Active Engagement. Post-pitch interest confirmed — wants case study.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-31", personId: "p-rachel", activityType: "meeting", source: "manual", date: "2026-02-06", time: "15:00", outcome: "connected", detail: "Pitched OwnEZ via Zoom — 40 min. She asked detailed questions about ITIN lending model, default rates, and borrower demographics. Very analytical. Wants a case study of a similar investor before committing. Ken's warm intro clearly helped.", documentsAttached: ["OwnEZ Investor Deck v3.pdf"], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-32", personId: "p-rachel", activityType: "meeting", source: "manual", date: "2026-01-28", time: "11:00", outcome: "connected", detail: "Zoom discovery — 25 min. Ken's warm intro set good context. She manages family trust, looking for yield alternatives to fixed income. Currently 60/40 traditional allocation.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-33", personId: "p-rachel", activityType: "email", source: "manual", date: "2026-01-18", time: "09:00", outcome: "connected", detail: "Ken sent intro email connecting Rachel with Chad.", documentsAttached: [], loggedById: "u-ken", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
 
   // === 3 AUTO-SYNCED ACTIVITIES ===
-  { id: "a-auto-1", personId: "p-robert", activityType: "call", source: "zoho_telephony", date: "2026-03-14", time: "14:30", outcome: "connected", detail: "Inbound call — 8 min. Robert called to ask about Fund V closing timeline.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-auto-2", personId: "p-sandra", activityType: "email", source: "o365_sync", date: "2026-03-12", time: "10:15", outcome: "connected", detail: "Auto-synced email: RE: Entity Structure — Sandra confirmed LLC route with attorney.", documentsAttached: [], loggedById: "u-chad", annotation: null },
-  { id: "a-auto-3", personId: "p-grant", activityType: "call", source: "zoho_telephony", date: "2026-02-20", time: "09:45", outcome: "attempted", detail: "Outbound call — no answer. Left second voicemail.", documentsAttached: [], loggedById: "u-chad", annotation: null },
+  { id: "a-auto-1", personId: "p-robert", activityType: "call", source: "zoho_telephony", date: "2026-03-14", time: "14:30", outcome: "connected", detail: "Inbound call — 8 min. Robert called to ask about Fund V closing timeline.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-auto-2", personId: "p-sandra", activityType: "email", source: "o365_sync", date: "2026-03-12", time: "10:15", outcome: "connected", detail: "Auto-synced email: RE: Entity Structure — Sandra confirmed LLC route with attorney.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
+  { id: "a-auto-3", personId: "p-grant", activityType: "call", source: "zoho_telephony", date: "2026-02-20", time: "09:45", outcome: "attempted", detail: "Outbound call — no answer. Left second voicemail.", documentsAttached: [], loggedById: "u-chad", annotation: null, fulfillsCommitmentId: null, commitmentType: null, commitmentDetail: null, commitmentDueDate: null, commitmentStatus: null, commitmentClosedDate: null },
 ];
 
 // ─── Relationship Links ───
@@ -389,6 +390,15 @@ let relatedContactLinks: RelatedContactLink[] = [
 ];
 
 // ─── Initial state snapshots (for test reset) ───
+// Captured BEFORE backfillCommitmentsFromLegacyFields runs below, so that
+// resetMockData() produces a pristine pre-backfill state. E2E tests call
+// POST /api/test-reset in beforeEach and then seed their own commitments via
+// seedPersonWithOpenCommitment; if the snapshot included backfilled rows,
+// those tests would end up in multi-commitment mode (tested person has TWO
+// open commitments), breaking the `close-out-fulfilled` singular-testid
+// contract. User manual browsing is unaffected because the user doesn't
+// trigger test-reset — their initial page view sees the backfilled state
+// populated by the backfill call below.
 const INITIAL_ORGANIZATIONS = JSON.stringify(organizations);
 const INITIAL_PEOPLE = JSON.stringify(people);
 const INITIAL_FUNDING_ENTITIES = JSON.stringify(fundingEntities);
@@ -397,6 +407,12 @@ const INITIAL_ACTIVITIES = JSON.stringify(activities);
 const INITIAL_REFERRER_LINKS = JSON.stringify(referrerLinks);
 const INITIAL_RELATED_CONTACT_LINKS = JSON.stringify(relatedContactLinks);
 const INITIAL_USERS = JSON.stringify(users);
+
+// Run the one-shot backfill AFTER the snapshots are captured so the user's
+// dashboard starts with synthesized commitment_set rows (otherwise every
+// seeded prospect looks not-overdue in v2 mode). See
+// backfillCommitmentsFromLegacyFields below for the full rationale.
+backfillCommitmentsFromLegacyFields();
 
 function resetMockData() {
   organizations = JSON.parse(INITIAL_ORGANIZATIONS);
@@ -413,13 +429,94 @@ function resetMockData() {
   activityTypeConfigs = JSON.parse(INITIAL_ACTIVITY_TYPE_CONFIGS);
 }
 
+/**
+ * One-shot backfill that synthesizes open commitment_set activity rows from
+ * each prospect's legacy Person.nextAction* fields.
+ *
+ * The mock seed predates the Commitments Lifecycle (v2) feature and stores
+ * next actions only on Person.nextActionDate / nextActionType / nextActionDetail.
+ * In v2 mode, overdue/stale are driven by open commitment_set rows in the
+ * activities table — if no such rows exist, every seeded prospect looks
+ * not-overdue regardless of how past-due their legacy nextActionDate is.
+ *
+ * This function is the mock-provider equivalent of scripts/backfill-
+ * commitments.ts, which runs against Neon before the production flag flip.
+ * Keeping them behaviorally equivalent means the manual walkthrough against
+ * `DATA_PROVIDER=mock COMMITMENTS_V2=on` produces the same UI state that
+ * post-backfill production will show.
+ *
+ * Idempotent by construction — called fresh on each resetMockData() and skips
+ * any person who already has an open commitment_set row (so an already-backfilled
+ * array isn't double-populated).
+ *
+ * NOT gated behind isCommitmentsV2Enabled() — the backfilled rows are invisible
+ * to legacy code paths (stale.ts passes `openCommitments=null` when the flag is
+ * off, ignoring them entirely), so they're safe to have in memory regardless.
+ */
+function backfillCommitmentsFromLegacyFields() {
+  const SKIP_STAGES = new Set(["dead", "nurture", "funded"]);
+  for (const person of people) {
+    if (!person.nextActionDate) continue;
+    if (!person.pipelineStage || SKIP_STAGES.has(person.pipelineStage)) continue;
+
+    const alreadyHasOpen = activities.some(
+      (a) =>
+        a.personId === person.id &&
+        a.activityType === "commitment_set" &&
+        a.commitmentStatus === "open"
+    );
+    if (alreadyHasOpen) continue;
+
+    activities.push({
+      id: `c-backfill-${person.id}`,
+      personId: person.id,
+      activityType: "commitment_set",
+      source: "manual",
+      date: person.nextActionDate,
+      time: "00:00",
+      outcome: "connected",
+      detail: "Backfilled from legacy Next Action",
+      documentsAttached: [],
+      loggedById: "u-chad",
+      annotation: null,
+      fulfillsCommitmentId: null,
+      commitmentType: person.nextActionType ?? "follow_up",
+      commitmentDetail: person.nextActionDetail ?? "",
+      commitmentDueDate: person.nextActionDate,
+      commitmentStatus: "open",
+      commitmentClosedDate: null,
+    });
+  }
+}
+
 // ─── Helper: enrich person with computed fields ───
 function enrichPerson(person: Person): PersonWithComputed {
   const personActivities = activities.filter((a) => a.personId === person.id);
   const today = getTodayCT();
   const daysSinceLastTouch = computeDaysSinceLastTouch(personActivities, today);
-  const isStale = computeIsStale(person.pipelineStage, daysSinceLastTouch, person.nextActionDate, today);
-  const isOverdue = computeIsOverdue(person.pipelineStage, person.nextActionDate, today);
+
+  // Commitments v2: when the flag is on, overdue/stale are driven by open
+  // commitment rows instead of the Person-level nextActionDate. When off,
+  // pass null to preserve the legacy behavior byte-for-byte.
+  // Feature flag removal: see docs/feature-flag-removal-checklist.md.
+  const openCommitmentsForStale = isCommitmentsV2Enabled()
+    ? personActivities.filter(
+        (a) => a.activityType === "commitment_set" && a.commitmentStatus === "open"
+      )
+    : null;
+  const isStale = computeIsStale(
+    person.pipelineStage,
+    daysSinceLastTouch,
+    person.nextActionDate,
+    openCommitmentsForStale,
+    today
+  );
+  const isOverdue = computeIsOverdue(
+    person.pipelineStage,
+    person.nextActionDate,
+    openCommitmentsForStale,
+    today
+  );
 
   const org = person.organizationId
     ? organizations.find((o) => o.id === person.organizationId)
@@ -432,6 +529,10 @@ function enrichPerson(person: Person): PersonWithComputed {
     ? people.find((p) => p.id === referrerLink.referrerId)
     : null;
 
+  const openCommitmentCount = personActivities.filter(
+    (a) => a.activityType === "commitment_set" && a.commitmentStatus === "open"
+  ).length;
+
   return {
     ...person,
     organizationName: org?.name ?? null,
@@ -441,6 +542,7 @@ function enrichPerson(person: Person): PersonWithComputed {
     isOverdue,
     activityCount: personActivities.filter((a) => TOUCH_ACTIVITY_TYPES.includes(a.activityType)).length,
     referrerName: referrer?.fullName ?? null,
+    openCommitmentCount,
   };
 }
 
@@ -1010,6 +1112,147 @@ export function createMockDataService(): DataService {
     async updateSystemConfig(data: Partial<SystemConfig>): Promise<SystemConfig> {
       systemConfig = { ...systemConfig, ...data };
       return { ...systemConfig };
+    },
+
+    // ─── Commitments lifecycle (DESIGN-SPEC §5.9) ───
+    // Mock provider has a complete in-memory implementation. The Neon provider
+    // stubs these until the schema migration adding commitment columns lands.
+
+    async getOpenCommitments(personId: string): Promise<Activity[]> {
+      return activities
+        .filter(
+          (a) =>
+            a.personId === personId &&
+            a.activityType === "commitment_set" &&
+            a.commitmentStatus === "open"
+        )
+        .sort((a, b) => (a.commitmentDueDate ?? "").localeCompare(b.commitmentDueDate ?? ""));
+    },
+
+    async createCommitment(personId, data): Promise<Activity> {
+      const id = `a-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const now = new Date();
+      const time = now.toLocaleTimeString("en-US", {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "America/Chicago",
+      });
+      const newActivity: Activity = {
+        id,
+        personId,
+        activityType: "commitment_set",
+        source: "manual",
+        date: getTodayCT(),
+        time,
+        outcome: "connected",
+        detail: `Next action set: ${data.commitmentDetail}`,
+        documentsAttached: [],
+        loggedById: data.loggedById,
+        annotation: null,
+        fulfillsCommitmentId: null,
+        commitmentType: data.commitmentType,
+        commitmentDetail: data.commitmentDetail,
+        commitmentDueDate: data.commitmentDueDate,
+        commitmentStatus: "open",
+        commitmentClosedDate: null,
+      };
+      activities.push(newActivity);
+      return newActivity;
+    },
+
+    async closeOutCommitment(commitmentId, resolution): Promise<Activity> {
+      const commitment = activities.find((a) => a.id === commitmentId);
+      if (!commitment) {
+        throw new Error(`Commitment ${commitmentId} not found`);
+      }
+      if (commitment.activityType !== "commitment_set") {
+        throw new Error(`Activity ${commitmentId} is not a commitment`);
+      }
+      if (commitment.commitmentStatus !== "open") {
+        throw new Error(
+          `Commitment ${commitmentId} is not open (status: ${commitment.commitmentStatus})`
+        );
+      }
+      commitment.commitmentStatus = resolution.status;
+      commitment.commitmentClosedDate = resolution.closedDate;
+
+      if (resolution.status === "fulfilled" && resolution.fulfilledByActivityId) {
+        const fulfilling = activities.find((a) => a.id === resolution.fulfilledByActivityId);
+        if (fulfilling) {
+          fulfilling.fulfillsCommitmentId = commitmentId;
+        }
+      }
+      return commitment;
+    },
+
+    async dropLead(personId, data): Promise<Person> {
+      const person = people.find((p) => p.id === personId);
+      if (!person) {
+        throw new Error(`Person ${personId} not found`);
+      }
+      const today = getTodayCT();
+      const oldStage = person.pipelineStage;
+
+      // Update stage + clear next action
+      person.pipelineStage = data.target;
+      person.stageChangedDate = today;
+      person.nextActionType = null;
+      person.nextActionDetail = null;
+      person.nextActionDate = null;
+      if (data.target === "dead" && data.lostReason) {
+        person.lostReason = data.lostReason;
+      }
+      if (data.target === "nurture" && data.reengageDate) {
+        person.reengageDate = data.reengageDate;
+      }
+
+      // Cancel any open commitments for this person
+      for (const a of activities) {
+        if (
+          a.personId === personId &&
+          a.activityType === "commitment_set" &&
+          a.commitmentStatus === "open"
+        ) {
+          a.commitmentStatus = "cancelled";
+          a.commitmentClosedDate = today;
+        }
+      }
+
+      // Auto-log stage change activity
+      const oldLabel = oldStage
+        ? PIPELINE_STAGES.find((s) => s.key === oldStage)?.label ?? oldStage
+        : "None";
+      const newLabel = data.target === "dead" ? "Dead" : "Nurture";
+      const reasonSuffix =
+        data.target === "dead" && data.reasonNote ? ` — ${data.reasonNote}` : "";
+      const stageChange: Activity = {
+        id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        personId,
+        activityType: "stage_change",
+        source: "manual",
+        date: today,
+        time: new Date().toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "America/Chicago",
+        }),
+        outcome: "connected",
+        detail: `Stage updated from ${oldLabel} to ${newLabel}${reasonSuffix}`,
+        documentsAttached: [],
+        loggedById: data.loggedById,
+        annotation: null,
+        fulfillsCommitmentId: null,
+        commitmentType: null,
+        commitmentDetail: null,
+        commitmentDueDate: null,
+        commitmentStatus: null,
+        commitmentClosedDate: null,
+      };
+      activities.push(stageChange);
+
+      return { ...person };
     },
 
     // ─── Testing ───

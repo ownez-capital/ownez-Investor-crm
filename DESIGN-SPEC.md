@@ -125,6 +125,13 @@ Every individual in the system exists once. A person can have multiple roles: Pr
 | Documents Attached | File Upload | No | PDFs, decks, etc. |
 | Logged By | Lookup: User | Auto | Auto-populated from logged-in user |
 | Annotation | Long Text | No | For adding notes to auto-synced activities |
+| Fulfills Commitment | Lookup: Activity | No | When this activity fulfills a prior Commitment Set entry, links to that entry's ID. See Section 5.9. |
+| **Commitment-only fields (populated only when Activity Type = Commitment Set):** | | | |
+| Commitment Type | Picklist | Conditional | Snapshot of Next Action Type at the moment the commitment was made (Follow Up, Schedule Meeting, etc.) |
+| Commitment Detail | Text (250 chars) | Conditional | Snapshot of Next Action Detail |
+| Commitment Due Date | Date | Conditional | Snapshot of Next Action Date |
+| Commitment Status | Picklist | Conditional | `open`, `fulfilled`, `superseded`, `cancelled`. Terminal states are set by the close-out flow (Section 5.9). |
+| Commitment Closed Date | Date | Conditional | Date the commitment moved to a terminal state. Null while `open`. |
 
 ### 2.5 Funded Investment (Child of Funding Entity)
 
@@ -203,8 +210,11 @@ Configurable via admin panel (planned).
 | Document Received | Yes | No |
 | Reassignment | Auto on rep change | N/A |
 | Prospect Added | Auto on prospect creation | N/A |
+| Commitment Set | Auto when Next Action is set or changed | N/A |
 
 "Prospect Added" is a system-generated activity automatically created when a new prospect is saved (`createPerson()` in the data service). It timestamps the start of the relationship and ensures the timeline is never empty. It is never manually creatable.
+
+"Commitment Set" is system-generated whenever a Next Action is created or changed via the post-activity prompt, post-stage-change prompt, or Next Action Bar edit mode. It is never manually creatable. It captures a snapshot of the commitment (Type, Detail, Due Date) and carries the close-out lifecycle defined in Section 5.9. "Commitment Set" is excluded from Days Since Last Touch calculation — it is an audit marker, not an interaction.
 
 Configurable via admin panel.
 
@@ -222,17 +232,25 @@ Configurable via admin panel.
 
 ## 5. Business Logic & Automations
 
-### 5.1 Stale Flag (Computed Live)
+### 5.1 Stale Flag & Overdue Flag (Computed Live)
 
-**Logic:** `daysIdle >= stageThreshold AND (nextActionDate IS NULL OR nextActionDate <= today) AND stage is active (not Nurture/Dead/Funded)`
+Both flags are computed on every page load from activity and commitment data. No scheduled batch job needed — always accurate.
 
-Computed on every page load from activity data. No scheduled batch job needed — always accurate.
+**Overdue logic:** `EXISTS (open commitment with dueDate <= today) AND stage is active (not Nurture/Dead/Funded)`
 
-**Key rule:** A future Next Action Date suppresses the stale flag. Marcus Johnson at 12 days idle with a March 1 next action is NOT stale. A missing Next Action Date does NOT suppress — if there's no scheduled action and idle time exceeds threshold, the record is stale.
+A prospect is overdue if and only if there is at least one commitment still in `open` status with a due date on or before today. Commitments in `fulfilled`, `superseded`, or `cancelled` terminal states do not contribute to the overdue flag. This is the key guarantee of Section 5.9: the dashboard tells the truth about what Chad still owes.
+
+**Stale logic:** `daysIdle >= stageThreshold AND NOT hasFutureOpenCommitment AND stage is active (not Nurture/Dead/Funded)`
+
+Where `hasFutureOpenCommitment` = there exists at least one open commitment with `dueDate > today`.
+
+**Key rule:** A future-dated open commitment suppresses the stale flag. Marcus Johnson at 12 days idle with a March 1 open commitment is NOT stale. No open commitment at all does NOT suppress — if there is nothing scheduled and idle time exceeds threshold, the record is stale.
+
+A prospect can be simultaneously stale and overdue (multiple commitments), or touched today and still overdue (touched via an unrelated activity that did not fulfill the open commitment — see Scenario B in Section 5.9).
 
 ### 5.2 Days Since Last Touch (Computed Live)
 
-Calculated as the number of days since the most recent *real interaction* Activity Log entry for a prospect. **Excludes** Activity Type = "Stage Change" and "Reassignment" — these are audit trail entries, not engagement signals. Only calls, emails, meetings, notes, texts, LinkedIn, WhatsApp, and document activities count as touches. Computed on display, not stored.
+Calculated as the number of days since the most recent *real interaction* Activity Log entry for a prospect. **Excludes** Activity Type = "Stage Change", "Reassignment", "Prospect Added", and "Commitment Set" — these are audit trail entries, not engagement signals. Only calls, emails, meetings, notes, texts, LinkedIn, WhatsApp, and document activities count as touches. Computed on display, not stored.
 
 ### 5.3 Stage Change Auto-Log
 
@@ -299,11 +317,91 @@ This guarantees every prospect has at least one activity from day one. It means:
 3. The post-creation "What's Next?" prompt has context without being fed stale data
 4. Next Action prompt always makes sense (there's always a preceding event to reference)
 
+### 5.9 Commitments & Close-out Lifecycle
+
+**Problem being solved:** Historically, the Next Action fields on Person were a forecast — they told you what Chad *said* he'd do next, but not whether he actually did it. If Chad logged a new activity and hit Enter through the prompt, the old Next Action would be silently overwritten with no record of whether the prior commitment was fulfilled, forgotten, or superseded. Dashboard overdue flags could clear simply because Chad logged a note, even if the note had nothing to do with the outstanding commitment.
+
+**The model:** A commitment is a first-class, auditable event. Every time a Next Action is set or changed, the system writes a `Commitment Set` activity that carries a snapshot of the Type, Detail, and Due Date. This activity starts in `open` status and moves to a terminal state (`fulfilled`, `superseded`, `cancelled`) through explicit user action.
+
+**When Commitment Set entries are written (auto):**
+- After the Quick Log post-activity Next Action prompt is confirmed (any path that results in a new or replaced commitment)
+- After the post-stage-change prompt is confirmed
+- When Next Action is edited via the Next Action Bar (EditNextAction component)
+- When a prospect is created with a Next Action already set (Create Prospect flow)
+
+**When Commitment Set entries are NOT written:**
+- When Chad hits Enter through the post-activity prompt *without changing anything* — this is a no-op. The existing open commitment stays open.
+- When the close-out path is `P Still pending` (see close-out flow below) — no new commitment, the old one stays open.
+
+**Commitment status lifecycle:**
+
+| Status | Meaning | How it's set |
+|---|---|---|
+| `open` | Active commitment, still owed | Initial state when Commitment Set is created |
+| `fulfilled` | Completed by a specific activity | User picks `D Done` in close-out prompt; the fulfilling activity's `fulfillsCommitmentId` is set to this commitment |
+| `superseded` | Explicitly replaced without being fulfilled | User picks `R Replace` in close-out prompt, or edits Next Action via the Bar while an open commitment exists |
+| `cancelled` | Lead dropped before commitment was completed | Stage changes to Dead or Nurture while this commitment is open |
+
+Every status transition stamps `Commitment Closed Date` to today.
+
+**Close-out prompt (triggers after Quick Log save if there is an open commitment with `dueDate <= today`):**
+
+Before the standard Next Action prompt, a close-out step appears:
+
+```
+⚠ Outstanding: Follow Up — Q3 deck — due Mar 5 (2d overdue)
+
+   [D] Done — this activity handled it
+   [P] Still pending — logging something unrelated, stays open
+   [R] Replace — drop this, set a new one
+```
+
+- **D Done** (internal status → `fulfilled`): the just-saved activity's `fulfillsCommitmentId` is set to the open commitment; flow proceeds to the standard Next Action prompt (set the next commitment).
+- **P Still pending:** no link, no status change; flow skips the Next Action prompt entirely and goes straight to the success banner. The open commitment stays open and the prospect remains overdue on the dashboard — this is the honest representation of "Chad logged a side note but still owes the prior commitment."
+- **R Replace** (internal status → `superseded`): flow proceeds to the Next Action prompt with the Date field empty and required (user must actively choose a new due date — no carrying over an already-abandoned date).
+
+**When the close-out prompt does NOT fire:**
+- No open commitment exists (fresh prospect, or every commitment is already terminal) → straight to standard Next Action prompt
+- Open commitment exists but `dueDate > today` → straight to standard Next Action prompt (no need to close out a commitment that isn't due yet; confirming through the Next Action prompt with no changes is a no-op and the commitment stays open and future-dated)
+
+**Multiple open commitments:** Rare but possible (e.g., admin reassignment without close-out, or historical data). If more than one open commitment exists at close-out time, the prompt lists them all and the F/P/R choice applies per commitment in a single step (stacked list, keyboard-navigable). Default: all → P Still pending. This stays a degenerate edge case; the normal working pattern is one open commitment at a time.
+
+**Commitment Set is hidden from Days Since Last Touch** — it's an audit marker, not an interaction. Days Idle is still driven by real outreach activities.
+
+**Commitment Set appears on the timeline** as a small inline event with a ◉ glyph, styled like Stage Change markers (de-emphasized but always visible). Activities that fulfill a commitment render an explicit link underneath: *"✓ Done: [Commitment Type] — [Detail] (Nd late)"*. Still-open, replaced, and cancelled commitments also render their current status inline.
+
+**Interaction with Drop Lead (Section 5.10):** When a lead is dropped from the post-activity prompt, any open commitments are automatically marked `cancelled` (not `superseded` — cancelled conveys "the whole relationship ended," superseded conveys "I chose a different next action"). On resurrection, cancelled commitments stay cancelled — they do not come back to `open`.
+
+### 5.10 Drop Lead from Post-Activity Prompt
+
+**Problem being solved:** Today, marking a lead Dead (or Nurture) requires abandoning the Quick Log flow, navigating to Person Detail, using the stage bar, picking a Lost Reason, and then dismissing a second post-stage-change prompt. For a lead that said "not interested" during the call Chad just logged, this is ~8 clicks and two separate prompts.
+
+**The flow:** Inside the post-activity Next Action prompt, a small secondary link is always visible: *"Drop lead ▸"*. Clicking it expands an inline panel in place (no modal, no navigation):
+
+```
+Drop lead:  [ Dead ]  [ Nurture ]
+```
+
+- **Dead path:** click opens inline Lost/Dead Reason chips (6 values from §4.4) plus an optional note field → Confirm.
+- **Nurture path:** click opens a Re-engage Date quick-pick (§6.9 date chips) → Confirm.
+
+**On confirm:**
+1. Stage changes to Dead or Nurture (auto-logs Stage Change activity — existing behavior from §5.3)
+2. `nextActionType`, `nextActionDetail`, `nextActionDate` are cleared on the Person record
+3. Any open commitments for this person are marked `cancelled` (see §5.9)
+4. The post-stage-change prompt is **suppressed** on this path — Chad already knows there is no next action because the whole point of dropping the lead is that there is nothing next
+5. Success banner: *"Marked Dead — history preserved. Resurrect anytime from the stage bar."*
+6. Page reloads to the dashboard or pipeline view (not Person Detail — the lead is gone from the active view, no reason to stay on it)
+
+**Resurrection:** Unchanged from today. Navigate to Person Detail via the People Directory (filtered for Dead/Nurture) and use the stage bar to move back to an active stage. All activity history, including cancelled commitments, remains intact for context.
+
+**Keyboard:** On the Next Action prompt, `Esc` or `Tab → D` enters Drop mode. Reason chips are keyboard-navigable. Full flow from "finished logging activity" to "lead marked Dead" should be achievable in under 5 keystrokes.
+
 ### 5.7 Zoho-Side Automations (IT Checklist)
 
 These run in Zoho, not in the frontend:
-- Daily overdue email to Chad (7 AM CT) — prospects where Next Action Date < today
-- Funded alert email to Eric — triggered when stage changes to Funded
+- **Daily overdue email to Chad (7 AM CT)** — prospects where at least one Activity Log row exists with `Activity Type = Commitment Set` AND `Commitment Status = open` AND `Commitment Due Date <= today`, and the prospect's stage is active (not Nurture/Dead/Funded). Note: this replaces the previous `Next Action Date < today` query; the overdue source of truth is now the commitments lifecycle (§5.9). Full migration notes in [docs/zoho-commitments-integration.md §3](docs/zoho-commitments-integration.md).
+- **Funded alert email to Eric** — triggered when stage changes to Funded (unchanged).
 
 ---
 
@@ -463,17 +561,36 @@ Placeholder uses the person's name so it feels contextual, not generic.
 
 **Post-activity flow (continuous, no navigation):**
 
-After Quick Log submit, a compact inline prompt replaces the Quick Log area:
+After Quick Log submit, a sequence of up to three inline steps replaces the Quick Log area. The fast path is unchanged from before — Enter through — for the common case of no outstanding commitment.
+
+**Step 1 — Close-out prompt (conditional, only fires if there is an open commitment with `dueDate <= today` — see §5.9):**
+
+```
+⚠ Outstanding: Follow Up — Q3 deck — due Mar 5 (2d overdue)
+
+   [D] Done — this activity handled it
+   [P] Still pending — logging something unrelated, stays open
+   [R] Replace — drop this, set a new one
+```
+
+- `D` links the just-saved activity to the commitment and marks the commitment `fulfilled` (internal status), then continues to Step 2
+- `P` leaves the commitment untouched and open (dashboard stays honestly overdue), then skips straight to Step 3 (success banner) — no new commitment is set
+- `R` marks the commitment `superseded` (internal status), then continues to Step 2 with the Date field cleared
+
+**Step 2 — Next Action prompt (skipped only if user chose `P Still pending` in Step 1):**
 
 ```
 Next action? [Follow Up ▾] [                    ] [Tomorrow ▾]  [✓ Confirm]
-                                          [↑ Advance to Active Engagement?]
+                                          [↑ Advance to Active Engagement?]   [Drop lead ▸]
 ```
 
-1. **Next Action prompt:** Detail field starts *empty* with the old value as gray placeholder text (not pre-filled as editable text). Cursor begins at the start of the field. If user confirms without typing, the old value is preserved as-is. Not skippable.
+1. **Next Action prompt:** Detail field starts *empty* with the old value as gray placeholder text (not pre-filled as editable text). Cursor begins at the start of the field. If user confirms without typing, the old value is preserved as-is (and a new `Commitment Set` activity is written — the old commitment was already closed out in Step 1, or there was no open commitment to begin with). If the user arrived via `R Replace` in Step 1, the Date field is empty and required.
 2. **Advance Stage shortcut:** "Advance to [Next Stage]?" — styled as a clearly clickable gold underline link, `text-sm` (not tiny). One tap → stage advances.
-3. After confirming, a green "Activity logged" success banner shows for 1.5 seconds, then the page reloads to reflect the new state (updated timeline, updated next action, updated stage if changed).
-4. **Post-confirm state summary:** After user hits Confirm, a brief confirmation view shows the updated prospect state: stage, next action, days since last touch. Gives visual reassurance that the update worked.
+3. **Drop lead shortcut:** "Drop lead ▸" link opens the inline Drop panel (see §5.10). Dead or Nurture, inline Lost Reason or Re-engage Date, Confirm. Skips Step 3's standard banner in favor of a "Marked Dead" banner.
+
+**Step 3 — Success state:** After confirming (or after Step 1 `P Still pending`), a green "Activity logged" success banner shows for 1.5 seconds, then the page reloads to reflect the new state (updated timeline, updated next action, updated commitment statuses, updated stage if changed).
+
+4. **Post-confirm state summary:** Shown briefly in the success banner area: stage, next action (or "No next action — lead dropped"), days since last touch, outstanding commitments count. Gives visual reassurance that the update worked.
 
 **6.4.3 Next Action Bar** *(after Quick Log)*
 Displays current Next Action Type + Detail + Date. When overdue or stale, a red urgency banner appears *above* the gold Next Action card. Editable via a separate edit mode component (EditNextAction) that uses a muted background container so white inputs contrast clearly. Date input uses quick-pick chips (see Section 6.9). "Advance to next stage?" shown as text-xs link.
@@ -502,7 +619,30 @@ Colored dot communicates type — no badges on entries.
 ─── Reassigned: Chad → New Rep · Mar 15, 2026 ───
 ```
 
-Stage changes and reassignments always show regardless of active filter.
+**Next action set entries** (see §5.9) render as small inline markers with a ◉ glyph. They always show the next-action type, detail, and due date, and — once terminal — the status badge. **Important:** the DB column and internal code name is `commitment_set`, but the user-facing label uses plain-language "Next action set" / "done" / "replaced" — Chad is setting a next action, not making a "commitment". Treat "Commitment" as an internal-codebase term only; never surface it to the user.
+```
+◉ Next action set · Follow Up · Q3 deck · due Mar 5
+◉ Next action set · Follow Up · Q3 deck · due Mar 5 · ✓ done (2d late)
+◉ Next action set · Follow Up · Q3 deck · due Mar 5 · ↺ replaced
+◉ Next action set · Follow Up · Q3 deck · due Mar 5 · ✕ cancelled
+```
+
+**Fulfillment links on activities** — when an activity was used to close out a prior next action, its entry shows a small green done line directly underneath:
+```
+📧 Email · Mar 7
+   "Sent Q3 deck with annotations."
+   ✓ Done: Follow Up — Q3 deck (2d late)
+```
+
+**Still-open next actions** that have become overdue render with an additional urgency line below the marker when viewed in the timeline on the date they go past due:
+```
+◉ Next action set · Follow Up · Q3 deck · due Mar 5
+   ⚠ Still open as of today (Nd overdue)
+```
+
+Stage changes, reassignments, and commitment events always show regardless of active filter — they form the backbone of the relationship narrative. Only the interaction filter pills (Calls, Emails, Meetings, Notes) hide non-matching interaction entries.
+
+**User-facing copy reference:** [docs/user-quick-log-guide.md](docs/user-quick-log-guide.md) is the canonical source for the plain-language labels Chad sees (`Done`, `replaced`, `Next action set`). The DB/API contract continues to use the internal terms (`commitment_set`, `fulfilled`, `superseded`).
 
 **Filter pills above timeline (5 pills, reduced from 8):**
 ```
@@ -1028,6 +1168,15 @@ interface DataService {
   createActivity(personId: string, data: CreateActivityInput): Promise<Activity>
   annotateActivity(activityId: string, note: string): Promise<Activity>
 
+  // Commitments (see §5.9) — commitments ARE activities (Activity Type = Commitment Set) so they share storage
+  // with the Activity Log. These methods are convenience wrappers around the underlying activity operations.
+  getOpenCommitments(personId: string): Promise<Activity[]> // Activity Type = Commitment Set AND status = 'open'
+  createCommitment(personId: string, data: CreateCommitmentInput): Promise<Activity> // writes a Commitment Set activity
+  closeOutCommitment(
+    commitmentId: string,
+    resolution: { status: 'fulfilled' | 'superseded' | 'cancelled'; fulfilledByActivityId?: string }
+  ): Promise<Activity> // stamps terminal state + closedDate; sets fulfillsCommitmentId on the fulfilling activity when status='fulfilled'
+
   // Funded Investments
   getFundedInvestments(filters?: FundedFilters): Promise<FundedInvestment[]>
   createFundedInvestment(data: CreateFundedInput): Promise<FundedInvestment>
@@ -1138,6 +1287,8 @@ IT team implements against the same interface. See Section 13 for the full integ
 
 > **Context for IT:** This frontend is the *only* interface the sales team uses. Zoho is the database and automation engine — users never log into Zoho's UI. Every field listed below must be exposed via API so the frontend can read/write it. The frontend handles all display, workflow prompts, and computed fields (stale flags, days idle) — Zoho just stores and syncs.
 
+> **Commitments Lifecycle (v2) integration:** The commitment-specific fields, picklist values, and automation changes in this section are a summary. The authoritative handoff for the Zoho integration team — with field-by-field semantics, before/after flow diagrams, backfill timing, and a testing checklist — is **[docs/zoho-commitments-integration.md](docs/zoho-commitments-integration.md)**. If anything in this section contradicts that document, the detailed doc wins.
+
 ### Phase 1: Zoho Backend Setup
 
 - [ ] Confirm Zoho CRM edition (Professional+ required for custom modules and API access)
@@ -1153,6 +1304,8 @@ IT team implements against the same interface. See Section 13 for the full integ
 - [ ] Create "Activity Log" custom related list under People with fields from Section 2.4
   - [ ] Include `Outcome` field (picklist: Connected, Attempted) — new field, tracks whether two-way exchange occurred
   - [ ] Include `Source` field (picklist: Manual, Zoho Telephony, O365 Sync) — distinguishes user-logged vs. auto-captured entries
+  - [ ] Include `Fulfills Commitment` lookup field (self-referencing to Activity Log) — links a fulfilling activity to the Commitment Set entry it closes out (see §5.9)
+  - [ ] Include `Commitment Type`, `Commitment Detail`, `Commitment Due Date`, `Commitment Status`, `Commitment Closed Date` — populated only on Activity Type = Commitment Set (see §5.9)
 - [ ] Create "Funded Investments" module with fields from Section 2.5
 
 **Relationships:**
@@ -1167,9 +1320,10 @@ IT team implements against the same interface. See Section 13 for the full integ
 **Picklists:**
 - [ ] Pipeline Stage — 11 values from Section 3
 - [ ] Lead Source — 10 values from Section 4.2 (**must match exactly** — the UI chip picker maps directly to these picklist API keys. No extra values, no renamed values.)
-- [ ] Activity Type — 11 values from Section 4.3 (including "Prospect Added" — system-only, never manually selected, but must exist as a valid picklist value so auto-created activities can be written)
+- [ ] Activity Type — 12 values from Section 4.3 (including "Prospect Added" and "Commitment Set" — system-only, never manually selected, but must exist as valid picklist values so auto-created activities can be written)
 - [ ] Next Action Type — 7 values from Section 4.1
 - [ ] Activity Outcome — 2 values (Connected, Attempted)
+- [ ] Commitment Status — 4 values (open, fulfilled, superseded, cancelled)
 - [ ] Entity Type — 6 values (LLC, LLP, Trust, Individual, Corporation, Other)
 - [ ] Lost/Dead Reason — 6 values
 - [ ] Track — 2 values (Maintain, Grow)
@@ -1234,7 +1388,7 @@ The frontend now edits many fields directly on the Person Detail page without na
 
 ### Phase 4: Zoho-Side Automations
 
-- [ ] Daily overdue email to Chad (7 AM CT) — prospects where Next Action Date < today and stage is active
+- [ ] Daily overdue email to Chad (7 AM CT) — prospects with at least one **open** commitment (Activity Type = Commitment Set, Status = open) due on or before today, where stage is active. Note: this is not `Next Action Date < today`; the overdue source of truth is now the commitments lifecycle (see §5.9).
 - [ ] Funded alert email to Eric — triggered when stage field changes to Funded
 - [ ] (Optional) Weekly pipeline summary email to Eric
 
@@ -1246,8 +1400,8 @@ See Section 8.2 for detailed migration steps.
 
 The following are calculated live by the frontend and do **not** need corresponding Zoho fields:
 
-- **Days Since Last Touch** — computed from latest Activity Log date
-- **Stale Flag** — computed from idle days vs. stage threshold + Next Action Date (see Section 5.1)
+- **Days Since Last Touch** — computed from latest Activity Log date (excluding Commitment Set, Stage Change, Reassignment, Prospect Added)
+- **Stale Flag & Overdue Flag** — computed from idle days, stage threshold, and open-commitment state (see §5.1, §5.9). Zoho does not store these; the frontend derives them per request from Activity Log rows where Activity Type = Commitment Set.
 - **Pipeline Value, Committed total, Funded YTD** — aggregated from stored fields at query time
 - **Commitment Date** — *is* stored in Zoho (set by frontend when Committed Amount changes), but the *trigger logic* lives in the frontend, not a Zoho workflow
 

@@ -52,6 +52,17 @@ export const TOUCH_ACTIVITY_TYPES: ActivityType[] = [
   "document_received",
 ];
 
+/**
+ * Activity types that are treated as audit markers rather than engagement signals.
+ * Excluded from Days Since Last Touch and activity count calculations.
+ * See DESIGN-SPEC §5.2.
+ */
+export const AUDIT_MARKER_ACTIVITY_TYPES: ActivityType[] = [
+  "stage_change",
+  "reassignment",
+  "commitment_set",
+];
+
 export const NEXT_ACTION_TYPES: { key: string; label: string }[] = [
   { key: "follow_up", label: "Follow Up" },
   { key: "schedule_meeting", label: "Schedule Meeting" },
@@ -98,6 +109,7 @@ export const ACTIVITY_TYPES: {
   { key: "document_received", label: "Doc Received", icon: "FileDown", color: "var(--color-activity-doc)" },
   { key: "stage_change", label: "Stage Change", icon: "ArrowRight", color: "var(--color-activity-stage)" },
   { key: "reassignment", label: "Reassignment", icon: "UserPlus", color: "var(--color-activity-stage)" },
+  { key: "commitment_set", label: "Next Action Set", icon: "Target", color: "var(--color-activity-stage)" },
 ];
 
 export const LOST_REASONS: { key: string; label: string }[] = [

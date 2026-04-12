@@ -18,6 +18,7 @@ import type {
 import { ACTIVE_PIPELINE_STAGES, COMMITTED_STAGES, PIPELINE_STAGES, TOUCH_ACTIVITY_TYPES } from "../../../constants";
 import { computeDaysSinceLastTouch, computeIsStale, computeIsOverdue } from "../../../stale";
 import { getTodayCT } from "../../../format";
+import { isCommitmentsV2Enabled } from "../../../feature-flags";
 
 // Helper to convert row to Person
 function rowToPerson(row: typeof schema.people.$inferSelect): Person {
@@ -59,8 +60,26 @@ async function enrichPerson(db: NeonDb, person: Person): Promise<PersonWithCompu
 
   const activitiesTyped = personActivities as Activity[];
   const daysSinceLastTouch = computeDaysSinceLastTouch(activitiesTyped, today);
-  const isStale = computeIsStale(person.pipelineStage, daysSinceLastTouch, person.nextActionDate, today);
-  const isOverdue = computeIsOverdue(person.pipelineStage, person.nextActionDate, today);
+
+  // Commitments v2 flag-gated. See docs/feature-flag-removal-checklist.md.
+  const openCommitmentsForStale = isCommitmentsV2Enabled()
+    ? activitiesTyped.filter(
+        (a) => a.activityType === "commitment_set" && a.commitmentStatus === "open"
+      )
+    : null;
+  const isStale = computeIsStale(
+    person.pipelineStage,
+    daysSinceLastTouch,
+    person.nextActionDate,
+    openCommitmentsForStale,
+    today
+  );
+  const isOverdue = computeIsOverdue(
+    person.pipelineStage,
+    person.nextActionDate,
+    openCommitmentsForStale,
+    today
+  );
 
   let organizationName: string | null = null;
   if (person.organizationId) {
@@ -85,6 +104,10 @@ async function enrichPerson(db: NeonDb, person: Person): Promise<PersonWithCompu
     TOUCH_ACTIVITY_TYPES.includes(a.activityType as Activity["activityType"])
   ).length;
 
+  const openCommitmentCount = activitiesTyped.filter(
+    (a) => a.activityType === "commitment_set" && a.commitmentStatus === "open"
+  ).length;
+
   return {
     ...person,
     organizationName,
@@ -94,6 +117,7 @@ async function enrichPerson(db: NeonDb, person: Person): Promise<PersonWithCompu
     isOverdue,
     activityCount,
     referrerName,
+    openCommitmentCount,
   };
 }
 
@@ -266,6 +290,12 @@ export async function getDrilldownActivities(db: NeonDb, filter: DrilldownActivi
       documentsAttached: a.documentsAttached as string[],
       loggedById: a.loggedById,
       annotation: a.annotation,
+      fulfillsCommitmentId: null,
+      commitmentType: null,
+      commitmentDetail: null,
+      commitmentDueDate: null,
+      commitmentStatus: null,
+      commitmentClosedDate: null,
       personName: personMap.get(a.personId) ?? "Unknown",
     }));
 }

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getDataService } from "@/lib/data";
 import { getSession } from "@/lib/auth";
+import { isCommitmentsV2Enabled } from "@/lib/feature-flags";
 import { IdentityBar } from "@/components/person/identity-bar";
 import { NextActionBar } from "@/components/person/next-action-bar";
 import { QuickLog } from "@/components/person/quick-log";
@@ -66,7 +67,7 @@ export default async function PersonDetailPage({
       {/* Cockpit Zone — sticky below last-viewed bar: identity, quick log, next action */}
       <div className="sticky top-[33px] z-10 bg-background border-b px-3 md:px-8 py-3 md:py-4 space-y-2 md:space-y-3 overflow-hidden">
         <IdentityBar person={person} />
-        <QuickLog person={person} />
+        <QuickLog person={person} commitmentsV2Enabled={isCommitmentsV2Enabled()} />
         <NextActionBar person={person} />
       </div>
 

@@ -4,6 +4,7 @@ import { runMigrations } from "./migrate";
 import { seedDatabase } from "./seed";
 import * as peopleQueries from "./queries/people";
 import * as activitiesQueries from "./queries/activities";
+import * as commitmentsQueries from "./queries/commitments";
 import * as organizationsQueries from "./queries/organizations";
 import * as fundingQueries from "./queries/funding";
 import * as leadershipQueries from "./queries/leadership";
@@ -246,6 +247,26 @@ export function createNeonDataService(): DataService {
     async createActivityType(data) {
       await ensureInitialized();
       return adminQueries.createActivityType(db, data);
+    },
+
+    // ─── Commitments lifecycle (DESIGN-SPEC §5.9) ───
+    // Real implementations; gated behind COMMITMENTS_V2 at the API route layer.
+    // The underlying columns are nullable and unused when the flag is off.
+    async getOpenCommitments(personId) {
+      await ensureInitialized();
+      return commitmentsQueries.getOpenCommitments(db, personId);
+    },
+    async createCommitment(personId, data) {
+      await ensureInitialized();
+      return commitmentsQueries.createCommitment(db, personId, data);
+    },
+    async closeOutCommitment(commitmentId, resolution) {
+      await ensureInitialized();
+      return commitmentsQueries.closeOutCommitment(db, commitmentId, resolution);
+    },
+    async dropLead(personId, data) {
+      await ensureInitialized();
+      return commitmentsQueries.dropLead(db, personId, data);
     },
 
     // ─── Testing ───

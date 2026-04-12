@@ -182,6 +182,12 @@ async function main() {
       documentsAttached: [],
       loggedById: "u-chad",
       annotation: null,
+      fulfillsCommitmentId: null,
+      commitmentType: null,
+      commitmentDetail: null,
+      commitmentDueDate: null,
+      commitmentStatus: null,
+      commitmentClosedDate: null,
     });
   }
 

@@ -47,10 +47,40 @@ export type ActivityType =
   | "stage_change"
   | "document_sent"
   | "document_received"
-  | "reassignment";
+  | "reassignment"
+  | "commitment_set";
 
 export type ActivitySource = "manual" | "zoho_telephony" | "o365_sync";
 export type ActivityOutcome = "connected" | "attempted";
+
+/**
+ * Lifecycle status for a Commitment Set activity. See DESIGN-SPEC.md §5.9.
+ *
+ * - `open`: active commitment, still owed
+ * - `fulfilled`: completed by a specific activity (linked via fulfillsCommitmentId)
+ * - `superseded`: explicitly replaced without being fulfilled
+ * - `cancelled`: lead was dropped (Dead/Nurture) while this commitment was open
+ *
+ * Terminal states (`fulfilled`, `superseded`, `cancelled`) are never transitioned
+ * back to `open`. On resurrection, new commitments are created going forward.
+ */
+export type CommitmentStatus = "open" | "fulfilled" | "superseded" | "cancelled";
+
+/**
+ * Default null values for the six commitment-related fields on Activity.
+ * Spread this into any activity object literal that isn't a commitment row,
+ * to satisfy the required-but-null shape of the Activity interface.
+ *
+ *   const a: Activity = { ...EMPTY_COMMITMENT_FIELDS, id: "...", ... };
+ */
+export const EMPTY_COMMITMENT_FIELDS = {
+  fulfillsCommitmentId: null,
+  commitmentType: null,
+  commitmentDetail: null,
+  commitmentDueDate: null,
+  commitmentStatus: null,
+  commitmentClosedDate: null,
+} as const;
 
 export type EntityType = "llc" | "llp" | "trust" | "individual" | "corporation" | "other";
 export type EntityStatus = "active" | "pending_setup" | "inactive";
@@ -130,6 +160,30 @@ export interface Activity {
   documentsAttached: string[];
   loggedById: string;
   annotation: string | null;
+
+  // ─── Commitments lifecycle (DESIGN-SPEC §5.9) ───
+  // All commitment fields are null on non-commitment activity types.
+  // `fulfillsCommitmentId` may be set on any activity type that fulfilled a prior
+  // commitment. The five `commitment*` fields are only populated when
+  // `activityType === "commitment_set"`.
+
+  /** Links this activity to the Commitment Set row it fulfilled (if any). */
+  fulfillsCommitmentId: string | null;
+
+  /** Snapshot of Next Action Type when this commitment was created. */
+  commitmentType: NextActionType | null;
+
+  /** Snapshot of Next Action Detail when this commitment was created. */
+  commitmentDetail: string | null;
+
+  /** Snapshot of Next Action Date when this commitment was created. */
+  commitmentDueDate: string | null;
+
+  /** Current lifecycle status of this commitment. Null on non-commitment rows. */
+  commitmentStatus: CommitmentStatus | null;
+
+  /** Date the commitment transitioned to a terminal state. Null while open. */
+  commitmentClosedDate: string | null;
 }
 
 export interface FundedInvestment {
@@ -177,6 +231,12 @@ export interface PersonWithComputed extends Person {
   isOverdue: boolean;
   activityCount: number;
   referrerName: string | null;
+  /**
+   * Count of commitments currently in `open` status for this person.
+   * When the feature flag is off, this is always 0 and overdue/stale are
+   * computed from the legacy Person-level nextActionDate. See DESIGN-SPEC §5.9.
+   */
+  openCommitmentCount: number;
 }
 
 // ─── Leadership Stats ───
@@ -322,6 +382,59 @@ export interface DataService {
   getActivities(personId: string, filters?: ActivityFilters): Promise<Activity[]>;
   getRecentActivities(filters?: RecentActivityFilters): Promise<RecentActivityEntry[]>;
   createActivity(personId: string, data: Omit<Activity, "id" | "personId">): Promise<Activity>;
+
+  // ─── Commitments lifecycle (DESIGN-SPEC §5.9) ───
+  // Commitments are stored as Activity Log rows with activityType === "commitment_set".
+  // These methods are convenience wrappers for the close-out flow.
+
+  /** Returns commitments in `open` status for this person, sorted by due date ASC. */
+  getOpenCommitments(personId: string): Promise<Activity[]>;
+
+  /**
+   * Creates a new Commitment Set activity row.
+   * Callers should also update the Person's denormalized nextAction* fields
+   * via updatePerson() in the same logical operation.
+   */
+  createCommitment(
+    personId: string,
+    data: {
+      commitmentType: NextActionType;
+      commitmentDetail: string;
+      commitmentDueDate: string;
+      loggedById: string;
+    }
+  ): Promise<Activity>;
+
+  /**
+   * Transitions a Commitment Set row from `open` to a terminal state.
+   * When status is `fulfilled`, caller must pass `fulfilledByActivityId` so the
+   * fulfilling activity's `fulfillsCommitmentId` field is stamped.
+   */
+  closeOutCommitment(
+    commitmentId: string,
+    resolution: {
+      status: Exclude<CommitmentStatus, "open">;
+      fulfilledByActivityId?: string;
+      closedDate: string;
+    }
+  ): Promise<Activity>;
+
+  /**
+   * Drop a lead (Dead or Nurture) from the post-activity flow.
+   * Atomically: updates stage, clears next action fields, cancels open
+   * commitments, and logs a Stage Change activity.
+   * See DESIGN-SPEC §5.10.
+   */
+  dropLead(
+    personId: string,
+    data: {
+      target: "dead" | "nurture";
+      lostReason?: LostReason;
+      reasonNote?: string;
+      reengageDate?: string;
+      loggedById: string;
+    }
+  ): Promise<Person>;
 
   // Funding Entities
   getFundingEntities(personId: string): Promise<FundingEntity[]>;
