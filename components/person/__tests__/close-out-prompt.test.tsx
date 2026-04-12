@@ -83,7 +83,7 @@ describe("CloseOutPrompt — single commitment", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("pressing F then Enter confirms with action=fulfilled", () => {
+  it("pressing D then Enter confirms with action=fulfilled", () => {
     const onResolve = vi.fn();
     render(
       <CloseOutPrompt
@@ -92,7 +92,7 @@ describe("CloseOutPrompt — single commitment", () => {
         onCancel={() => {}}
       />
     );
-    fireEvent.keyDown(window, { key: "f" });
+    fireEvent.keyDown(window, { key: "d" });
     fireEvent.keyDown(window, { key: "Enter" });
     expect(onResolve).toHaveBeenCalledTimes(1);
     expect(onResolve.mock.calls[0][0]).toEqual([

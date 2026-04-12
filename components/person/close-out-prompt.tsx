@@ -39,15 +39,21 @@ type ResolutionAction = CloseOutResolution["action"];
 // resolution key stays "fulfilled" because it maps 1:1 to the API contract
 // (`status: "fulfilled"` in the close-out POST body) and the testid
 // (`close-out-fulfilled`). Do not rename the key.
+//
+// The hotkey letter D matches the button title "Done" for readability. Earlier
+// iterations used F (for Fulfilled), which has been retired from user copy.
+// D does NOT collide with DropLeadPanel's D-for-Dead hotkey because the two
+// panels are mutually exclusive — CloseOutPrompt resolves first, THEN the
+// Next Action prompt (which can expand DropLeadPanel) appears.
 const ACTION_META: {
   key: ResolutionAction;
-  hotkey: "F" | "P" | "R";
+  hotkey: "D" | "P" | "R";
   title: string;
   description: string;
 }[] = [
   {
     key: "fulfilled",
-    hotkey: "F",
+    hotkey: "D",
     title: "Done",
     description: "this activity handled it",
   },
@@ -162,7 +168,7 @@ export function CloseOutPrompt({
       if (!first) return;
 
       const key = e.key.toLowerCase();
-      if (key === "f") {
+      if (key === "d") {
         e.preventDefault();
         setAction(first.id, "fulfilled");
       } else if (key === "p") {
