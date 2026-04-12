@@ -126,12 +126,12 @@ These scenarios verify that the close-out prompt fires correctly and each of the
 5. Press Enter
 
 **Expected — Close-out prompt appears:**
-> ⚠ Outstanding: Follow up — Q3 deck — due <date> (2d overdue)
-> [F] Fulfilled — this activity handled it
-> [P] Still pending — logging something unrelated, commitment stays open
+> ⚠ Outstanding: Follow Up — Q3 deck — due <date> (2d overdue)
+> [D] Done — this activity handled it
+> [P] Still pending — logging something unrelated, stays open
 > [R] Replace — drop this, set a new one
 
-6. Press `F` or click "Fulfilled"
+6. Press `D` or click "Done"
 
 **Expected — Next Action prompt appears:**
 - Detail placeholder shows old value
@@ -142,9 +142,9 @@ These scenarios verify that the close-out prompt fires correctly and each of the
 **Expected after confirm:**
 - Success banner appears
 - Timeline shows:
-  - New `📧 Email` entry at top with **`✓ Fulfilled: Follow up — Q3 deck (2d late)`** link underneath
-  - The OLD `◉ Commitment set` marker for Q3 deck now shows `✓ fulfilled (2d late)` badge
-  - A NEW `◉ Commitment set` marker for the new meeting commitment
+  - New `📧 Email` entry at top with **`✓ Done: Follow Up — Q3 deck (2d late)`** link underneath
+  - The OLD `◉ Next action set` marker for Q3 deck now shows `✓ done (2d late)` badge
+  - A NEW `◉ Next action set` marker for the new meeting commitment
 - Dashboard Action Queue no longer shows Robert overdue (clears honestly — the commitment was really fulfilled)
 - Next Action Bar shows the new meeting commitment
 
@@ -231,9 +231,9 @@ These scenarios verify that the close-out prompt fires correctly and each of the
 - Next Action prompt appears with empty date (because there was at least one Replace)
 6. Set new commitment, confirm
 7. Timeline shows:
-   - New Call entry with `✓ Fulfilled: <commitment 1>` link
-   - First commitment marker: `✓ fulfilled`
-   - Second commitment marker: `↺ superseded`
+   - New Call entry with `✓ Done: <commitment 1>` link
+   - First commitment marker: `✓ done`
+   - Second commitment marker: `↺ replaced`
    - New commitment marker: open
 
 **Pass/Fail:** ☐
