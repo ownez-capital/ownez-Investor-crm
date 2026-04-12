@@ -338,7 +338,7 @@ This guarantees every prospect has at least one activity from day one. It means:
 | Status | Meaning | How it's set |
 |---|---|---|
 | `open` | Active commitment, still owed | Initial state when Commitment Set is created |
-| `fulfilled` | Completed by a specific activity | User picks `F Fulfilled` in close-out prompt; the fulfilling activity's `fulfillsCommitmentId` is set to this commitment |
+| `fulfilled` | Completed by a specific activity | User picks `D Done` in close-out prompt; the fulfilling activity's `fulfillsCommitmentId` is set to this commitment |
 | `superseded` | Explicitly replaced without being fulfilled | User picks `R Replace` in close-out prompt, or edits Next Action via the Bar while an open commitment exists |
 | `cancelled` | Lead dropped before commitment was completed | Stage changes to Dead or Nurture while this commitment is open |
 
@@ -349,16 +349,16 @@ Every status transition stamps `Commitment Closed Date` to today.
 Before the standard Next Action prompt, a close-out step appears:
 
 ```
-⚠ Outstanding: Follow up — Q3 deck — due Mar 5 (2d overdue)
+⚠ Outstanding: Follow Up — Q3 deck — due Mar 5 (2d overdue)
 
-   [F] Fulfilled — this activity handled it
-   [P] Still pending — logging something unrelated, commitment stays open
+   [D] Done — this activity handled it
+   [P] Still pending — logging something unrelated, stays open
    [R] Replace — drop this, set a new one
 ```
 
-- **F Fulfilled:** the just-saved activity's `fulfillsCommitmentId` is set to the open commitment; commitment → `fulfilled`; flow proceeds to standard Next Action prompt (set the next commitment).
+- **D Done** (internal status → `fulfilled`): the just-saved activity's `fulfillsCommitmentId` is set to the open commitment; flow proceeds to the standard Next Action prompt (set the next commitment).
 - **P Still pending:** no link, no status change; flow skips the Next Action prompt entirely and goes straight to the success banner. The open commitment stays open and the prospect remains overdue on the dashboard — this is the honest representation of "Chad logged a side note but still owes the prior commitment."
-- **R Replace:** open commitment → `superseded`; flow proceeds to the Next Action prompt with the Date field empty and required (user must actively choose a new due date — no carrying over an already-abandoned date).
+- **R Replace** (internal status → `superseded`): flow proceeds to the Next Action prompt with the Date field empty and required (user must actively choose a new due date — no carrying over an already-abandoned date).
 
 **When the close-out prompt does NOT fire:**
 - No open commitment exists (fresh prospect, or every commitment is already terminal) → straight to standard Next Action prompt
@@ -368,7 +368,7 @@ Before the standard Next Action prompt, a close-out step appears:
 
 **Commitment Set is hidden from Days Since Last Touch** — it's an audit marker, not an interaction. Days Idle is still driven by real outreach activities.
 
-**Commitment Set appears on the timeline** as a small inline event with a ◉ glyph, styled like Stage Change markers (de-emphasized but always visible). Activities that fulfill a commitment render an explicit link underneath: *"✓ Fulfilled: [Commitment Type] — [Detail] (Nd late/on time)"*. Still-open and cancelled/superseded commitments also render their current status inline.
+**Commitment Set appears on the timeline** as a small inline event with a ◉ glyph, styled like Stage Change markers (de-emphasized but always visible). Activities that fulfill a commitment render an explicit link underneath: *"✓ Done: [Commitment Type] — [Detail] (Nd late)"*. Still-open, replaced, and cancelled commitments also render their current status inline.
 
 **Interaction with Drop Lead (Section 5.10):** When a lead is dropped from the post-activity prompt, any open commitments are automatically marked `cancelled` (not `superseded` — cancelled conveys "the whole relationship ended," superseded conveys "I chose a different next action"). On resurrection, cancelled commitments stay cancelled — they do not come back to `open`.
 
@@ -400,8 +400,8 @@ Drop lead:  [ Dead ]  [ Nurture ]
 ### 5.7 Zoho-Side Automations (IT Checklist)
 
 These run in Zoho, not in the frontend:
-- Daily overdue email to Chad (7 AM CT) — prospects where Next Action Date < today
-- Funded alert email to Eric — triggered when stage changes to Funded
+- **Daily overdue email to Chad (7 AM CT)** — prospects where at least one Activity Log row exists with `Activity Type = Commitment Set` AND `Commitment Status = open` AND `Commitment Due Date <= today`, and the prospect's stage is active (not Nurture/Dead/Funded). Note: this replaces the previous `Next Action Date < today` query; the overdue source of truth is now the commitments lifecycle (§5.9). Full migration notes in [docs/zoho-commitments-integration.md §3](docs/zoho-commitments-integration.md).
+- **Funded alert email to Eric** — triggered when stage changes to Funded (unchanged).
 
 ---
 
@@ -566,16 +566,16 @@ After Quick Log submit, a sequence of up to three inline steps replaces the Quic
 **Step 1 — Close-out prompt (conditional, only fires if there is an open commitment with `dueDate <= today` — see §5.9):**
 
 ```
-⚠ Outstanding: Follow up — Q3 deck — due Mar 5 (2d overdue)
+⚠ Outstanding: Follow Up — Q3 deck — due Mar 5 (2d overdue)
 
-   [F] Fulfilled — this activity handled it
-   [P] Still pending — logging something unrelated, commitment stays open
+   [D] Done — this activity handled it
+   [P] Still pending — logging something unrelated, stays open
    [R] Replace — drop this, set a new one
 ```
 
-- `F` links the just-saved activity to the commitment and marks the commitment `fulfilled`, then continues to Step 2
+- `D` links the just-saved activity to the commitment and marks the commitment `fulfilled` (internal status), then continues to Step 2
 - `P` leaves the commitment untouched and open (dashboard stays honestly overdue), then skips straight to Step 3 (success banner) — no new commitment is set
-- `R` marks the commitment `superseded`, then continues to Step 2 with the Date field cleared
+- `R` marks the commitment `superseded` (internal status), then continues to Step 2 with the Date field cleared
 
 **Step 2 — Next Action prompt (skipped only if user chose `P Still pending` in Step 1):**
 
@@ -641,6 +641,8 @@ Colored dot communicates type — no badges on entries.
 ```
 
 Stage changes, reassignments, and commitment events always show regardless of active filter — they form the backbone of the relationship narrative. Only the interaction filter pills (Calls, Emails, Meetings, Notes) hide non-matching interaction entries.
+
+**User-facing copy reference:** [docs/user-quick-log-guide.md](docs/user-quick-log-guide.md) is the canonical source for the plain-language labels Chad sees (`Done`, `replaced`, `Next action set`). The DB/API contract continues to use the internal terms (`commitment_set`, `fulfilled`, `superseded`).
 
 **Filter pills above timeline (5 pills, reduced from 8):**
 ```
@@ -1284,6 +1286,8 @@ IT team implements against the same interface. See Section 13 for the full integ
 ## 13. Zoho Integration Checklist (for IT Team)
 
 > **Context for IT:** This frontend is the *only* interface the sales team uses. Zoho is the database and automation engine — users never log into Zoho's UI. Every field listed below must be exposed via API so the frontend can read/write it. The frontend handles all display, workflow prompts, and computed fields (stale flags, days idle) — Zoho just stores and syncs.
+
+> **Commitments Lifecycle (v2) integration:** The commitment-specific fields, picklist values, and automation changes in this section are a summary. The authoritative handoff for the Zoho integration team — with field-by-field semantics, before/after flow diagrams, backfill timing, and a testing checklist — is **[docs/zoho-commitments-integration.md](docs/zoho-commitments-integration.md)**. If anything in this section contradicts that document, the detailed doc wins.
 
 ### Phase 1: Zoho Backend Setup
 
