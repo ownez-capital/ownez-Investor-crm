@@ -82,16 +82,32 @@ export function QuickLog({ person, commitmentsV2Enabled = false }: QuickLogProps
         }),
       });
 
+      // Fail loudly if the activity POST failed — otherwise the user keeps
+      // clicking through the close-out prompt believing their note is saved
+      // when it isn't (exactly the bug surfaced by the 2026-04-12 production
+      // smoke test: a provider-layer undefined-parameter error returned 500
+      // silently, the UI advanced, and Jay Samber's timeline was missing the
+      // logged note).
+      if (!res.ok) {
+        let errDetail = "";
+        try {
+          const body = await res.json();
+          errDetail = body?.error ?? `HTTP ${res.status}`;
+        } catch {
+          errDetail = `HTTP ${res.status}`;
+        }
+        alert(`Couldn't save activity: ${errDetail}. Please try again.`);
+        return;
+      }
+
       // Capture the created activity id — we need it to stamp on any
       // "fulfilled" resolution in the close-out step.
       let createdActivityId: string | null = null;
-      if (res.ok) {
-        try {
-          const body = await res.json();
-          createdActivityId = body?.activity?.id ?? body?.id ?? null;
-        } catch {
-          createdActivityId = null;
-        }
+      try {
+        const body = await res.json();
+        createdActivityId = body?.activity?.id ?? body?.id ?? null;
+      } catch {
+        createdActivityId = null;
       }
 
       // Reset log form

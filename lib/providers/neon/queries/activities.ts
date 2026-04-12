@@ -113,6 +113,13 @@ export async function createActivity(
 ): Promise<Activity> {
   const id = crypto.randomUUID();
 
+  // Neon's SQL tagged-template driver throws on `undefined` parameters
+  // (unlike `null` which it serializes correctly). Callers (the POST
+  // /api/activities route, legacy createActivity call sites) may omit the
+  // six commitment-related fields entirely from the activity payload when
+  // logging a non-commitment activity — in that case the property access
+  // yields `undefined`, not `null`. Coerce here so the driver is happy and
+  // callers don't have to remember.
   await db.execute(
     sql`INSERT INTO activities (
       id, person_id, activity_type, source, date, time, outcome, detail,
@@ -123,9 +130,9 @@ export async function createActivity(
     VALUES (
       ${id}, ${personId}, ${data.activityType}, ${data.source}, ${data.date},
       ${data.time}, ${data.outcome}, ${data.detail},
-      ${JSON.stringify(data.documentsAttached)}::jsonb, ${data.loggedById}, ${data.annotation},
-      ${data.fulfillsCommitmentId}, ${data.commitmentType}, ${data.commitmentDetail},
-      ${data.commitmentDueDate}, ${data.commitmentStatus}, ${data.commitmentClosedDate}
+      ${JSON.stringify(data.documentsAttached)}::jsonb, ${data.loggedById}, ${data.annotation ?? null},
+      ${data.fulfillsCommitmentId ?? null}, ${data.commitmentType ?? null}, ${data.commitmentDetail ?? null},
+      ${data.commitmentDueDate ?? null}, ${data.commitmentStatus ?? null}, ${data.commitmentClosedDate ?? null}
     )`
   );
 
