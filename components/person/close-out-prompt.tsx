@@ -35,6 +35,10 @@ export interface CloseOutPromptProps {
 
 type ResolutionAction = CloseOutResolution["action"];
 
+// User-visible copy uses plain language ("Done", "stays open"). The internal
+// resolution key stays "fulfilled" because it maps 1:1 to the API contract
+// (`status: "fulfilled"` in the close-out POST body) and the testid
+// (`close-out-fulfilled`). Do not rename the key.
 const ACTION_META: {
   key: ResolutionAction;
   hotkey: "F" | "P" | "R";
@@ -44,14 +48,14 @@ const ACTION_META: {
   {
     key: "fulfilled",
     hotkey: "F",
-    title: "Fulfilled",
+    title: "Done",
     description: "this activity handled it",
   },
   {
     key: "pending",
     hotkey: "P",
     title: "Still pending",
-    description: "logging something unrelated, commitment stays open",
+    description: "logging something unrelated, stays open",
   },
   {
     key: "replace",
@@ -181,7 +185,7 @@ export function CloseOutPrompt({
       data-testid="close-out-prompt"
       className="rounded-lg border border-alert-red/30 bg-alert-red/5 p-4 space-y-3"
       role="group"
-      aria-label="Outstanding commitment close-out"
+      aria-label="Outstanding next action close-out"
     >
       <div className="flex items-start gap-2">
         <AlertTriangle
