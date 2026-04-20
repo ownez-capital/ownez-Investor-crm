@@ -5,9 +5,9 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ChevronUp, ChevronDown, MessageSquare, ArrowRight } from "lucide-react";
 import { formatCurrency, formatRelativeDate } from "@/lib/format";
-import { STAGE_LABELS, LEAD_SOURCE_LABELS, NEXT_ACTION_TYPES, PIPELINE_STAGES, LEAD_SOURCES } from "@/lib/constants";
+import { STAGE_LABELS, LEAD_SOURCE_LABELS, NEXT_ACTION_TYPES, PIPELINE_STAGES } from "@/lib/constants";
 import { InlineQuickLog } from "./inline-quick-log";
-import type { PersonWithComputed, PipelineStage, LeadSource, User } from "@/lib/types";
+import type { PersonWithComputed, PipelineStage, LeadSource, User, LeadSourceConfig } from "@/lib/types";
 
 type SortKey = "fullName" | "organizationName" | "pipelineStage" | "initialInvestmentTarget" | "growthTarget" | "leadSource" | "activityCount" | "daysSinceLastTouch" | "nextActionDetail" | "nextActionDate" | "assignedRepName";
 
@@ -15,9 +15,10 @@ interface PipelineTableProps {
   people: PersonWithComputed[];
   users?: User[];
   initialRepFilter?: string;
+  leadSources?: LeadSourceConfig[];
 }
 
-export function PipelineTable({ people, users = [], initialRepFilter = "" }: PipelineTableProps) {
+export function PipelineTable({ people, users = [], initialRepFilter = "", leadSources = [] }: PipelineTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("nextActionDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [stageFilter, setStageFilter] = useState<PipelineStage | "">("");
@@ -174,7 +175,7 @@ export function PipelineTable({ people, users = [], initialRepFilter = "" }: Pip
           className="rounded-md border bg-card px-2.5 py-1.5 text-xs"
         >
           <option value="">All Sources</option>
-          {LEAD_SOURCES.map((s) => (
+          {leadSources.map((s) => (
             <option key={s.key} value={s.key}>{s.label}</option>
           ))}
         </select>

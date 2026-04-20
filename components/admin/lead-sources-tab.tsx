@@ -56,15 +56,23 @@ export function LeadSourcesTab({ sources: initialSources, userRole = "admin" }: 
   async function addSource() {
     const trimmed = newLabel.trim();
     if (!trimmed) { setAddingNew(false); return; }
-    const res = await fetch("/api/admin/lead-sources", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label: trimmed }),
-    });
-    const created: LeadSourceConfig = await res.json();
-    setSources((prev) => [...prev, created]);
-    setNewLabel("");
-    setAddingNew(false);
+    try {
+      const res = await fetch("/api/admin/lead-sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: trimmed }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Failed to create source");
+      }
+      const created: LeadSourceConfig = await res.json();
+      setSources((prev) => [...prev, created]);
+      setNewLabel("");
+      setAddingNew(false);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to add source");
+    }
   }
 
   return (

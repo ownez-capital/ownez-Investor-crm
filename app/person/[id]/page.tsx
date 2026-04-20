@@ -28,12 +28,13 @@ export default async function PersonDetailPage({
   const person = await ds.getPerson(id);
   if (!person) notFound();
 
-  const [activities, entities, relatedContacts, referrer, users] = await Promise.all([
+  const [activities, entities, relatedContacts, referrer, users, leadSources] = await Promise.all([
     ds.getActivities(id),
     ds.getFundingEntities(id),
     ds.getRelatedContacts(id),
     ds.getReferrerForProspect(id),
     ds.getUsers(),
+    ds.getLeadSources(),
   ]);
 
   // Get referrals if there's a referrer
@@ -82,6 +83,7 @@ export default async function PersonDetailPage({
               users={users}
               orgMembers={orgMembers}
               sessionRole={session?.role ?? "rep"}
+              leadSources={leadSources}
             />
 
             {/* Activity Timeline */}

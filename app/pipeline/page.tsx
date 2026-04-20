@@ -11,12 +11,13 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
   const { assignedRep } = await searchParams;
   const ds = await getDataService();
 
-  const [people, users] = await Promise.all([
+  const [people, users, leadSources] = await Promise.all([
     ds.getPeople({
       roles: ["prospect"],
       pipelineStages: ACTIVE_PIPELINE_STAGES,
     }),
     ds.getUsers(),
+    ds.getLeadSources(),
   ]);
 
   return (
@@ -25,7 +26,7 @@ export default async function PipelinePage({ searchParams }: PipelinePageProps) 
         &larr; Dashboard
       </Link>
       <h1 className="mt-2 mb-6 text-lg font-semibold text-navy">Pipeline</h1>
-      <PipelineTable people={people} users={users} initialRepFilter={assignedRep ?? ""} />
+      <PipelineTable people={people} users={users} initialRepFilter={assignedRep ?? ""} leadSources={leadSources} />
     </div>
   );
 }

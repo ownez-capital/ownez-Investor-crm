@@ -104,8 +104,12 @@ export async function createLeadSource(
     .replace(/^_|_$/g, "");
 
   const existing = await db.select().from(schema.leadSourceConfigs);
-  const order = existing.length;
 
+  if (existing.some((r) => r.key === key)) {
+    throw new Error(`A lead source called "${data.label}" already exists`);
+  }
+
+  const order = existing.length;
   const newSource = { key, label: data.label, order, isActive: true };
   await db.insert(schema.leadSourceConfigs).values(newSource);
   return newSource;

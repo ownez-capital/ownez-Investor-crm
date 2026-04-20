@@ -4,21 +4,22 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { LEAD_SOURCES, LOST_REASONS } from "@/lib/constants";
+import { LOST_REASONS } from "@/lib/constants";
 import { formatCurrency, getTodayCT } from "@/lib/format";
 import { LeadSourcePicker } from "@/components/ui/lead-source-picker";
 import { StageBar } from "@/components/person/stage-bar";
 import { OrganizationSection } from "@/components/person/organization-section";
-import type { PersonWithComputed, User } from "@/lib/types";
+import type { PersonWithComputed, User, LeadSourceConfig } from "@/lib/types";
 
 interface ProfileCardProps {
   person: PersonWithComputed;
   users: User[];
   orgMembers: PersonWithComputed[];
   sessionRole: string;
+  leadSources: LeadSourceConfig[];
 }
 
-export function ProfileCard({ person, users, orgMembers, sessionRole }: ProfileCardProps) {
+export function ProfileCard({ person, users, orgMembers, sessionRole, leadSources }: ProfileCardProps) {
   const router = useRouter();
   const [editing, setEditing] = useState<string | null>(null);
   const [stageInlineActive, setStageInlineActive] = useState(false);
@@ -116,7 +117,7 @@ export function ProfileCard({ person, users, orgMembers, sessionRole }: ProfileC
         ) : (
           <DetailRow
             label="Lead Source"
-            value={LEAD_SOURCES.find((s) => s.key === person.leadSource)?.label ?? "—"}
+            value={leadSources.find((s) => s.key === person.leadSource)?.label ?? "—"}
             editable={canEdit}
             onClick={() => canEdit && setEditing("leadSource")}
           />

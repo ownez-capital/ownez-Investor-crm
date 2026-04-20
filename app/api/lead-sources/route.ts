@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDataService } from "@/lib/data";
 import { requireSession } from "@/lib/auth";
-import { LEAD_SOURCES } from "@/lib/constants";
 
-// GET /api/lead-sources — returns sources sorted by frequency
+// GET /api/lead-sources — returns active sources sorted by frequency
 export async function GET() {
   try {
     await requireSession();
     const ds = await getDataService();
-    const counts = await ds.getLeadSourceCounts();
+    const [sources, counts] = await Promise.all([
+      ds.getLeadSources(),
+      ds.getLeadSourceCounts(),
+    ]);
 
-    const sorted = [...LEAD_SOURCES].sort((a, b) => {
+    const sorted = sources.sort((a, b) => {
       return (counts[b.key] ?? 0) - (counts[a.key] ?? 0);
     });
 
