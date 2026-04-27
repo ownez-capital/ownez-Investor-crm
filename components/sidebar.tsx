@@ -17,7 +17,7 @@ export async function Sidebar() {
           <p className="mt-0.5 text-base font-semibold text-white">CRM</p>
         </div>
 
-        <SidebarNav role={session.role} />
+        <SidebarNav role={session.role} permissions={session.permissions} />
 
         <div className="border-t border-navy-light">
           <SidebarUserMenu fullName={session.fullName} role={session.role} />
@@ -25,7 +25,7 @@ export async function Sidebar() {
       </aside>
 
       {/* Mobile bottom tab bar */}
-      <MobileNav role={session.role} fullName={session.fullName} />
+      <MobileNav role={session.role} fullName={session.fullName} permissions={session.permissions} />
     </>
   );
 }

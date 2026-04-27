@@ -12,22 +12,37 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import type { UserRole } from "@/lib/types";
+import { hasPermission } from "@/lib/auth";
+import type { UserRole, UserPermissions } from "@/lib/types";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["rep", "marketing", "admin"] as UserRole[] },
-  { href: "/pipeline", label: "Pipeline", icon: GitBranch, roles: ["rep", "marketing", "admin"] as UserRole[] },
-  { href: "/people", label: "People", icon: Users, roles: ["rep", "marketing", "admin"] as UserRole[] },
-  { href: "/leadership", label: "Leadership", icon: BarChart3, roles: ["marketing", "admin"] as UserRole[] },
-  { href: "/admin", label: "Admin", icon: Settings, roles: ["admin"] as UserRole[] },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  roles?: UserRole[];
+  permission?: keyof UserPermissions;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["rep", "marketing", "admin"] },
+  { href: "/pipeline", label: "Pipeline", icon: GitBranch, roles: ["rep", "marketing", "admin"] },
+  { href: "/people", label: "People", icon: Users, roles: ["rep", "marketing", "admin"] },
+  { href: "/leadership", label: "Leadership", icon: BarChart3, permission: "canViewLeadership" },
+  { href: "/admin", label: "Admin", icon: Settings, permission: "canAccessAdmin" },
 ];
 
-export function SidebarNav({ role }: { role: UserRole }) {
+function isVisible(item: NavItem, role: UserRole, permissions?: UserPermissions): boolean {
+  if (item.permission) return hasPermission({ role, permissions }, item.permission);
+  if (item.roles) return item.roles.includes(role);
+  return false;
+}
+
+export function SidebarNav({ role, permissions }: { role: UserRole; permissions?: UserPermissions }) {
   const pathname = usePathname();
 
   return (
     <nav className="flex-1 space-y-0.5 px-3 py-4">
-      {NAV_ITEMS.filter((item) => item.roles.includes(role)).map((item) => {
+      {NAV_ITEMS.filter((item) => isVisible(item, role, permissions)).map((item) => {
         const Icon = item.icon;
         const isActive = item.href === "/"
           ? pathname === "/"
@@ -69,7 +84,7 @@ function getInitials(fullName: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function MobileNav({ role, fullName }: { role: UserRole; fullName: string }) {
+export function MobileNav({ role, fullName, permissions }: { role: UserRole; fullName: string; permissions?: UserPermissions }) {
   const pathname = usePathname();
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -86,7 +101,7 @@ export function MobileNav({ role, fullName }: { role: UserRole; fullName: string
   return (
     <>
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex md:hidden border-t bg-navy safe-bottom">
-        {MOBILE_NAV_ITEMS.filter((item) => item.roles.includes(role)).map((item) => {
+        {MOBILE_NAV_ITEMS.filter((item) => isVisible(item, role, permissions)).map((item) => {
           const Icon = item.icon;
           const isActive = item.href === "/"
             ? pathname === "/"

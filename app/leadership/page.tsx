@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getSession, hasPermission } from "@/lib/auth";
 import { getDataService } from "@/lib/data";
 import { StatColumn } from "@/components/leadership/stat-column";
 import { PipelineFunnel } from "@/components/leadership/pipeline-funnel";
@@ -12,11 +12,12 @@ export default async function LeadershipPage() {
   if (!session) redirect("/login");
 
   // Auth guard: role or permission override
-  if (session.role !== "marketing" && session.role !== "admin") {
+  if (!hasPermission(session, "canViewLeadership")) {
     redirect("/");
   }
 
-  // Ken (marketing) gets partial access: Source ROI + Top Referrers only
+  // Marketing role gets partial access: Source ROI + Top Referrers only.
+  // Admins and rep-with-override see the full board.
   const isPartialAccess = session.role === "marketing";
 
   const ds = await getDataService();

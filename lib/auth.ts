@@ -31,6 +31,7 @@ export interface SessionPayload {
   username: string;
   fullName: string;
   role: UserRole;
+  permissions?: UserPermissions;
 }
 
 export async function createSession(user: SessionPayload): Promise<string> {
@@ -39,6 +40,7 @@ export async function createSession(user: SessionPayload): Promise<string> {
     username: user.username,
     fullName: user.fullName,
     role: user.role,
+    permissions: user.permissions ?? {},
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -69,6 +71,7 @@ export async function getSession(): Promise<SessionPayload | null> {
       username: payload.username as string,
       fullName: payload.fullName as string,
       role: payload.role as UserRole,
+      permissions: (payload.permissions as UserPermissions | undefined) ?? {},
     };
   } catch {
     return null;

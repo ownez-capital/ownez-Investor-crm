@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
       username: user.username,
       fullName: user.fullName,
       role: user.role,
+      permissions: user.permissions,
     });
 
     return NextResponse.json({ success: true, user: { id: user.id, fullName: user.fullName, role: user.role } });
