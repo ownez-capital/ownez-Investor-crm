@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { hasPermission } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 import type { UserRole, UserPermissions } from "@/lib/types";
 
 type NavItem = {
